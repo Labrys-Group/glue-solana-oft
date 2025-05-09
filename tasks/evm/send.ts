@@ -42,6 +42,7 @@ const action: ActionType<TaskArguments> = async (
         oftCmd: '0x',
     }
     const [msgFee] = await token.functions.quoteSend(sendParam, false)
+
     const txResponse = await token.functions.send(sendParam, msgFee, signer.address, {
         value: msgFee.nativeFee,
         gasLimit: 500_000,
@@ -57,4 +58,4 @@ task('send', 'Sends a transaction', action)
     .addParam('dstEid', 'Destination endpoint ID', undefined, types.int, false)
     .addParam('amount', 'Amount to send in wei', undefined, types.string, false)
     .addParam('to', 'Recipient address', undefined, types.string, false)
-    .addOptionalParam('contractName', 'Name of the contract in deployments folder', 'MyOFT', types.string)
+    .addOptionalParam('contractName', 'Name of the contract in deployments folder', 'gOFT', types.string)
