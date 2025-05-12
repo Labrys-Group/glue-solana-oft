@@ -241,6 +241,7 @@ export const getSolanaDeployment = (
         throw new Error('eid is required')
     }
     const outputDir = path.join('deployments', endpointIdToNetwork(eid))
+
     const filePath = path.join(outputDir, 'OFT.json') // Note: if you have multiple deployments, change this filename to refer to the desired deployment file
 
     if (!existsSync(filePath)) {

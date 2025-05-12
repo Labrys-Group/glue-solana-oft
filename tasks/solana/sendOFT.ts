@@ -43,10 +43,24 @@ task('lz:oft:solana:send', 'Send tokens from Solana to a target EVM chain')
 
         const solanaDeployment = getSolanaDeployment(fromEid)
 
-        const oftProgramId = publicKey(solanaDeployment.programId)
-        const mint = publicKey(solanaDeployment.mint)
-        const umiEscrowPublicKey = publicKey(solanaDeployment.escrow)
-        const tokenProgramId = tokenProgramStr ? publicKey(tokenProgramStr) : fromWeb3JsPublicKey(TOKEN_PROGRAM_ID)
+        // Validate solanaDeployment fields and tokenProgramStr
+        if (!solanaDeployment.programId) {
+            throw new Error('solanaDeployment.programId is undefined or empty!');
+        }
+        if (!solanaDeployment.mint) {
+            throw new Error('solanaDeployment.mint is undefined or empty!');
+        }
+        if (!solanaDeployment.escrow) {
+            throw new Error('solanaDeployment.escrow is undefined or empty!');
+        }
+        if (!tokenProgramStr) {
+            throw new Error('tokenProgramStr is undefined or empty!');
+        }
+
+        const oftProgramId = publicKey(solanaDeployment.programId);
+        const mint = publicKey(solanaDeployment.mint);
+        const umiEscrowPublicKey = publicKey(solanaDeployment.escrow);
+        const tokenProgramId = tokenProgramStr ? publicKey(tokenProgramStr) : fromWeb3JsPublicKey(TOKEN_PROGRAM_ID);
 
         const tokenAccount = findAssociatedTokenPda(umi, {
             mint,
