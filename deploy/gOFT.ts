@@ -6,9 +6,9 @@ const contractName = 'gOFT'
 
 ////// UPDATE THESE VALUES //////
 const tokenConfig = {
-    name: 'Hosico Cat',
-    symbol: 'HOSICO',
-    decimals: 6,
+    name: 'Bonk',
+    symbol: 'BONK',
+    decimals: 5,
 }
 ////// UPDATE THESE VALUES //////
 
