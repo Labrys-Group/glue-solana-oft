@@ -19,7 +19,7 @@ use state::*;
 
 declare_id!(Pubkey::new_from_array(program_id_from_env!(
     "OFT_ID",
-    "9UovNrJD8pQyBLheeHNayuG1wJSEAoxkmM14vw5gcsTT"
+    "FGrGEthyEeu5vmb84u7TG6HGWeHUrpim7y8jDCjrxCsT"
 )));
 
 pub const OFT_SEED: &[u8] = b"OFT";
@@ -32,7 +32,10 @@ pub mod oft {
     use super::*;
 
     pub fn oft_version(_ctx: Context<OFTVersion>) -> Result<Version> {
-        Ok(Version { interface: 2, message: 1 })
+        Ok(Version {
+            interface: 2,
+            message: 1,
+        })
     }
 
     pub fn init_oft(mut ctx: Context<InitOFT>, params: InitOFTParams) -> Result<()> {
