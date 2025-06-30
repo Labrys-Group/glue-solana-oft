@@ -40,6 +40,8 @@ impl InitOFT<'_> {
     pub fn apply(ctx: &mut Context<InitOFT>, params: &InitOFTParams) -> Result<()> {
         // Initialize the oft_store
         ctx.accounts.oft_store.oft_type = params.oft_type.clone();
+        msg!("Token decimals: {}", ctx.accounts.token_mint.decimals);
+        msg!("Provided shared_decimals: {}", params.shared_decimals);
         require!(
             ctx.accounts.token_mint.decimals >= params.shared_decimals,
             OFTError::InvalidDecimals
@@ -71,8 +73,14 @@ impl InitOFT<'_> {
             ctx.accounts.oft_store.endpoint_program,
             ctx.accounts.oft_store.key(),
             ctx.remaining_accounts,
-            &[OFT_SEED, ctx.accounts.token_escrow.key().as_ref(), &[ctx.bumps.oft_store]],
-            RegisterOAppParams { delegate: params.admin },
+            &[
+                OFT_SEED,
+                ctx.accounts.token_escrow.key().as_ref(),
+                &[ctx.bumps.oft_store],
+            ],
+            RegisterOAppParams {
+                delegate: params.admin,
+            },
         )
     }
 }

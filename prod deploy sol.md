@@ -57,7 +57,7 @@ pnpm hardhat lz:oft-adapter:solana:create --eid 30168 --program-id 7aJdnmHwaRWU4
 
 ### Deploy a OFT peer
 
-Don't forget to update the decimals in the oft contract!
+Don't forget to update the decimals in the oft contract, not just the deploy script!
 Update tokenConfig in the deploy script
 
 pnpm hardhat lz:deploy

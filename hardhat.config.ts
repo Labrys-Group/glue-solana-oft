@@ -66,8 +66,8 @@ const config: HardhatUserConfig = {
         // },
         'glue-mainnet': {
             eid: EndpointId.GLUE_V2_MAINNET,
-            // url: 'https://mainnet-node.m9.glue.net',
-            url: 'https://rpc.glue.net',
+            url: 'https://mainnet-node.m9.glue.net',
+            // url: 'https://rpc.glue.net',
             accounts,
             gasPrice: 125000000000, // 125 gwei -- hardcoded because glue mainnet rpcs are munted
         },
