@@ -17,6 +17,11 @@ contract gOFT is OFT {
 
     function decimals() public pure override returns (uint8) {
         // NOTE: Update this to the correct decimals for the token
-        return 6;
+        return 5;
+    }
+
+    function sharedDecimals() public pure override returns (uint8) {
+        // NOTE: Update this to the correct decimals for the token
+        return 5;
     }
 }

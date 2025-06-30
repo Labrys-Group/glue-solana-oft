@@ -35,7 +35,7 @@ const action: ActionType<TaskArguments> = async (
 
     const amountLD = BigNumber.from(amount)
 
-    const options = Options.newOptions().addExecutorLzReceiveOption(200000, 0).toHex().toString()
+    const options = Options.newOptions().addExecutorLzReceiveOption(250000, 0).toHex().toString()
 
     const sendParam = {
         dstEid,

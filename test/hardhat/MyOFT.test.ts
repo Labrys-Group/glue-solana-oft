@@ -98,4 +98,11 @@ describe('MyOFT Test', function () {
         expect(finalBalanceA).eql(initialAmount.sub(tokensToSend))
         expect(finalBalanceB).eql(tokensToSend)
     })
+
+    it('should have the correct decimal value', async function () {
+        // Get the decimal value from the contract
+        const decimals = await myOFTA.decimals()
+        // The default decimal value for most ERC20 tokens is 18
+        expect(decimals).to.equal(18)
+    })
 })

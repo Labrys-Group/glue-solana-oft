@@ -75,7 +75,8 @@ task('lz:oft-adapter:solana:create', 'Creates new OFT Adapter (OFT Store PDA)')
                         escrow: createSignerFromKeypair({ eddsa: eddsa }, lockBox),
                     },
                     oft.types.OFTType.Adapter,
-                    OFT_DECIMALS,
+                    //OFT_DECIMALS,
+                    5,
                     {
                         oft: programId,
                         token: tokenProgram ? publicKey(tokenProgram) : undefined,
