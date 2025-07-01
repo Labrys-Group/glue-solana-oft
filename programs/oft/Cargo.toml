@@ -22,3 +22,13 @@ anchor-spl = "0.29.0"
 oapp = { git = "https://github.com/LayerZero-Labs/LayerZero-v2.git", rev = "34321ac15e47e0dafd25d66659e2f3d1b9b6db8f" }
 utils = { git = "https://github.com/LayerZero-Labs/LayerZero-v2.git", rev = "34321ac15e47e0dafd25d66659e2f3d1b9b6db8f" }
 solana-helper = "0.1.0"
+solana-program = "=1.17.31"
+spl-token = "=4.0.0"
+spl-memo = "=4.0.0"
+num_enum_derive = "=0.7.2"
+
+[patch.crates-io]
+solana-program = "=1.17.31"
+spl-token = "=4.0.0"
+spl-memo = "=4.0.0"
+num_enum_derive = "=0.7.2"
