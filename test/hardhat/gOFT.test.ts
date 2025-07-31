@@ -1,7 +1,11 @@
+import { Program } from '@coral-xyz/anchor'
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
+import { PublicKey } from '@solana/web3.js'
 import { expect } from 'chai'
 import { Contract, ContractFactory } from 'ethers'
+import { readFileSync } from 'fs'
 import { deployments, ethers } from 'hardhat'
+// import OFTIDL from '../../target/idl/'
 
 describe.only('gOFT Test', function () {
     // Constant representing a mock Endpoint ID for testing purposes
@@ -38,6 +42,51 @@ describe.only('gOFT Test', function () {
 
         // Deploying gOFT contract
         gOFTContract = await gOFT.deploy('Glue OFT', 'gOFT', mockEndpointV2A.address, owner.address, 6)
+    })
+
+    it.only('Should fetch account data from mainnet', async () => {
+        const dmpData = readFileSync('../../dmp.json', 'utf8')
+        const dmp = JSON.parse(dmpData)
+        console.log('DMP Data:', dmp)
+
+        // const { createUmi } = await import('@metaplex-foundation/umi-bundle-defaults')
+        // const { publicKey } = await import('@metaplex-foundation/umi')
+        //
+        // const escrowAddress = '2N3ZQ4oyYusjprv5uiRGWVQ6qRJfHDzwGRmGp43ixkLg'
+        // const programId = '7aJdnmHwaRWU4E9Fz5dREB8XiwDDxb4Jz3E2FvjGRnso'
+        //
+        // const [oftStoreAddress] = PublicKey.findProgramAddressSync(
+        //     [Buffer.from('OFT'), new PublicKey(escrowAddress).toBuffer()],
+        //     new PublicKey(programId)
+        // )
+        // // const program = new Program()
+        // //
+        // // const config = await setup.feeVaultProgram.account.feeVaultMintAllocation.fetch(setup.feeVaultAllocationPda)
+        //
+        // console.log('Escrow Address:', escrowAddress)
+        // console.log('Program ID:', programId)
+        // console.log('OFT Store PDA:', oftStoreAddress.toBase58())
+        //
+        // // Fetch account data using Umi
+        // const umi = createUmi('https://api.mainnet-beta.solana.com')
+        //
+        // try {
+        //     const accountData = await umi.rpc.getAccount(publicKey('4o4asonmvhrZ6tiRrLTEYjJ4NENkuCAEJNdkxDh4uQD3'))
+        //
+        //     // const accountData = await umi.rpc.getAccount(publicKey(oftStoreAddress.toBase58()))
+        //
+        //     if (accountData.exists) {
+        //         console.log('Account exists!')
+        //         console.log('Owner:', accountData.owner)
+        //         console.log('Lamports:', accountData.lamports)
+        //         console.log('Data length:', accountData.data.length)
+        //         console.log('Data (hex):', Buffer.from(accountData.data).toString('hex'))
+        //     } else {
+        //         console.log('Account does not exist')
+        //     }
+        // } catch (error) {
+        //     console.error('Error fetching account:', error)
+        // }
     })
 
     it('should mint tokens for an array of users and check their balances are correct', async function () {
@@ -94,4 +143,3 @@ describe.only('gOFT Test', function () {
         expect(await gOFTContract.balanceOf(user1.address)).to.equal(mintAmount1)
     })
 })
-

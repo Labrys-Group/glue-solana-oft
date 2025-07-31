@@ -69,6 +69,7 @@ import * as dotenv from 'dotenv'
 
 import { EndpointProgram, NONCE_SEED } from '@layerzerolabs/lz-solana-sdk-v2'
 import { addressToBytes32 } from '@layerzerolabs/lz-v2-utilities'
+import { DATA_DMP } from '../dmp'
 
 // Load environment variables
 dotenv.config()
@@ -330,6 +331,127 @@ async function checkCurrentNonce(
     }
 }
 
+export interface LayerZeroMessage {
+    pathway: {
+        srcEid: number
+        dstEid: number
+        sender: {
+            address: string
+            chain: string
+        }
+        receiver: {
+            address: string
+            chain: string
+        }
+        id: string
+        nonce: number
+    }
+    source: {
+        status: string
+        tx: {
+            txHash: string
+            blockHash: string
+            blockNumber: string
+            blockTimestamp: number
+            from: string
+            payload: string
+            readinessTimestamp: number
+            options: {
+                lzReceive: {
+                    gas: string
+                    value: string
+                }
+                nativeDrop: Array<{
+                    amount: string
+                    receiver: string
+                }>
+                ordered: boolean
+            }
+        }
+    }
+    destination: {
+        nativeDrop: {
+            status: string
+        }
+        lzCompose: {
+            status: string
+        }
+        failedTx: Array<{
+            txHash: string
+            txError: string
+            blockHash: string
+            blockNumber: number
+            revertReason: string
+        }>
+        status: string
+    }
+    verification: {
+        dvn: {
+            dvns: Record<
+                string,
+                {
+                    txHash: string
+                    blockHash: string
+                    blockNumber: number
+                    blockTimestamp: number
+                    proof: {
+                        packetHeader: string
+                        payloadHash: string
+                    }
+                    optional: boolean
+                    status: string
+                }
+            >
+            status: string
+        }
+        sealer: {
+            tx: {
+                txHash: string
+                blockHash: string
+                blockNumber: number
+                blockTimestamp: number
+            }
+            status: string
+        }
+    }
+    guid: string
+    config: {
+        error: boolean
+        receiveLibrary: string
+        sendLibrary: string
+        inboundConfig: {
+            confirmations: number
+            requiredDVNCount: number
+            optionalDVNCount: number
+            optionalDVNThreshold: number
+            requiredDVNs: string[]
+            requiredDVNNames: string[]
+            optionalDVNs: string[]
+            optionalDVNNames: string[]
+        }
+        outboundConfig: {
+            confirmations: number
+            requiredDVNCount: number
+            optionalDVNCount: number
+            optionalDVNThreshold: number
+            requiredDVNs: string[]
+            requiredDVNNames: string[]
+            optionalDVNs: string[]
+            optionalDVNNames: string[]
+        }
+        ulnSendVersion: string
+        ulnReceiveVersion: string
+    }
+    status: {
+        name: string
+        message: string
+    }
+    created: string
+    updated: string
+}
+
+const goodEID = 30168
+
 async function skipNonceOnSolana(
     connection: Connection,
     payer: Keypair,
@@ -349,6 +471,17 @@ async function skipNonceOnSolana(
             )
         }
 
+        const matches = DATA_DMP.filter((d) => d.pathway.srcEid === srcEid && d.pathway.nonce === nonceToSkip)
+        if (matches.length > 2) {
+            throw new Error(
+                `Found ${matches.length} matches for EID ${srcEid} and nonce ${nonceToSkip}. Expected 0 or 1 match.`
+            )
+        }
+
+        const match = matches[0]
+
+        // const value =
+
         // Create UMI instance
         const umi = createUmi(connection.rpcEndpoint)
         const payerSigner = createSignerFromKeypair(umi, fromWeb3JsKeypair(payer))
@@ -358,7 +491,7 @@ async function skipNonceOnSolana(
         const endpoint = new EndpointProgram.Endpoint(ENDPOINT_PROGRAM_ID)
 
         // Convert addresses
-        const senderBytes = addressToBytes32(senderAddress)
+        const senderBytes = addressToBytes32(match.pathway.sender.address)
         const senderPublicKey = new PublicKey(senderBytes)
 
         console.log('Skip Parameters:')
@@ -450,7 +583,7 @@ async function skipNonceOnSolana(
         const skipIx = await endpoint.skip(
             payer.publicKey,
             senderPublicKey,
-            new PublicKey(receiverAddress),
+            new PublicKey(match.pathway.receiver.address),
             srcEid,
             nonceToSkip.toString()
         )
