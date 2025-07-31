@@ -9,19 +9,16 @@ import { Connection, Keypair, PublicKey, Transaction } from '@solana/web3.js'
 import { Command } from 'commander'
 import * as dotenv from 'dotenv'
 
-import { EndpointProgram } from '@layerzerolabs/lz-solana-sdk-v2'
+import { EndpointProgram, NONCE_SEED } from '@layerzerolabs/lz-solana-sdk-v2'
 import { addressToBytes32 } from '@layerzerolabs/lz-v2-utilities'
-
-// Import Nonce using require to avoid TypeScript module resolution issues
-const { Nonce } = require('@layerzerolabs/lz-solana-sdk-v2/umi')
 
 // Load environment variables
 dotenv.config()
 
 // LayerZero V2 endpoint program ID
 // Use your custom endpoint for devnet/testnet
-const ENDPOINT_PROGRAM_ID = new PublicKey('4riW6rPYZoHjyA57eXVTbkMxYS3yw6hDr9zxVWsZQ4oF') // Your devnet endpoint
-// const ENDPOINT_PROGRAM_ID = new PublicKey('76y77prsiCMvXMjuoZ5VRrhG5qYBrUMYTE5WgHqgjEn6') // Official LayerZero mainnet
+// const ENDPOINT_PROGRAM_ID = new PublicKey('4riW6rPYZoHjyA57eXVTbkMxYS3yw6hDr9zxVWsZQ4oF') // Your devnet endpoint
+const ENDPOINT_PROGRAM_ID = new PublicKey('76y77prsiCMvXMjuoZ5VRrhG5qYBrUMYTE5WgHqgjEn6') // Official LayerZero mainnet
 
 // Chain endpoint IDs
 const ENDPOINT_IDS: Record<string, number> = {
@@ -49,6 +46,7 @@ const ENDPOINT_IDS: Record<string, number> = {
 
     // Solana testnet EID for reference
     'solana-testnet': 40168,
+    'solana-devnet': 40168,
 }
 
 async function checkCurrentNonce(
@@ -67,10 +65,9 @@ async function checkCurrentNonce(
         const senderBytes = addressToBytes32(senderAddress)
         const receiverPublicKey = new PublicKey(receiverAddress)
 
-        // Derive the nonce PDA
-        // Based on the SDK pattern: ['Nonce', receiver, srcEid (big endian), sender]
+        // Derive the nonce PDA using LayerZero's pattern
         const seeds = [
-            Buffer.from('Nonce', 'utf8'),
+            Buffer.from(NONCE_SEED, 'utf8'),
             receiverPublicKey.toBuffer(),
             Buffer.from(new Uint32Array([srcEid]).buffer).reverse(), // Big endian u32
             Buffer.from(senderBytes),
@@ -79,22 +76,29 @@ async function checkCurrentNonce(
         // Find the PDA using the endpoint program
         const [noncePDA] = PublicKey.findProgramAddressSync(seeds, ENDPOINT_PROGRAM_ID)
 
+        console.log(`Checking nonce PDA: ${noncePDA.toBase58()}`)
+
         // Try to fetch the nonce account
-        const nonceAccount = await Nonce.fromAccountAddress(connection, noncePDA)
+        const accountInfo = await connection.getAccountInfo(noncePDA)
+        if (!accountInfo) {
+            return { inboundNonce: null, outboundNonce: null, exists: false }
+        }
+
+        // Parse the account data manually
+        // Nonce account structure: [discriminator: 8 bytes, bump: 1 byte, outbound: 8 bytes, inbound: 8 bytes]
+        const data = accountInfo.data
+        if (data.length < 25) {
+            console.warn('Account data too short to be a nonce account')
+            return { inboundNonce: null, outboundNonce: null, exists: false }
+        }
+
+        // Skip discriminator (8 bytes) and bump (1 byte), then read the nonces
+        const outboundNonce = Number(data.readBigUInt64LE(9)) // bytes 9-16
+        const inboundNonce = Number(data.readBigUInt64LE(17)) // bytes 17-24
 
         return {
-            inboundNonce:
-                typeof nonceAccount.inboundNonce === 'number'
-                    ? nonceAccount.inboundNonce
-                    : nonceAccount.inboundNonce.toNumber
-                      ? nonceAccount.inboundNonce.toNumber()
-                      : null,
-            outboundNonce:
-                typeof nonceAccount.outboundNonce === 'number'
-                    ? nonceAccount.outboundNonce
-                    : nonceAccount.outboundNonce.toNumber
-                      ? nonceAccount.outboundNonce.toNumber()
-                      : null,
+            inboundNonce,
+            outboundNonce,
             exists: true,
         }
     } catch (error: any) {
