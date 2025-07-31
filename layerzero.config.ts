@@ -14,23 +14,23 @@ import { getOftStoreAddress } from './tasks/solana'
 
 // const GLUE_V2_MAINNET_EID = 30342
 
-const glueMainnetContract: OmniPointHardhat = {
-    eid: EndpointId.GLUE_V2_MAINNET,
-    contractName: 'gOFT',
-}
-
-// const baseSepoliaContract: OmniPointHardhat = {
-//     eid: EndpointId.BASESEP_V2_TESTNET,
+// const glueMainnetContract: OmniPointHardhat = {
+//     eid: EndpointId.GLUE_V2_MAINNET,
 //     contractName: 'gOFT',
 // }
+
+const baseSepoliaContract: OmniPointHardhat = {
+    eid: EndpointId.BASESEP_V2_TESTNET,
+    contractName: 'gOFT',
+}
 
 // const SOLANA_MAINNET_EID = 30168
 
 const solanaContract: OmniPointHardhat = {
-    eid: EndpointId.SOLANA_V2_MAINNET,
-    address: getOftStoreAddress(EndpointId.SOLANA_V2_MAINNET),
-    // eid: EndpointId.SOLANA_V2_TESTNET,
-    // address: getOftStoreAddress(EndpointId.SOLANA_V2_TESTNET),
+    // eid: EndpointId.SOLANA_V2_MAINNET,
+    // address: getOftStoreAddress(EndpointId.SOLANA_V2_MAINNET),
+    eid: EndpointId.SOLANA_V2_TESTNET,
+    address: getOftStoreAddress(EndpointId.SOLANA_V2_TESTNET),
 }
 
 const EVM_ENFORCED_OPTIONS: OAppEnforcedOption[] = [
@@ -55,13 +55,15 @@ const SOLANA_ENFORCED_OPTIONS: OAppEnforcedOption[] = [
 // Learn more about the Simple Config Generator - https://docs.layerzero.network/v2/developers/evm/technical-reference/simple-config
 export default async function () {
     console.log('Generating connections config...')
-    console.log(`glueMainnetContract.eid: ${glueMainnetContract.eid}`)
+    //console.log(`glueMainnetContract.eid: ${glueMainnetContract.eid}`)
+    console.log(`baseSepoliaContract.eid: ${baseSepoliaContract.eid}`)
     console.log(`solanaContract.eid: ${solanaContract.eid}`)
     // note: pathways declared here are automatically bidirectional
     // if you declare A,B there's no need to declare B,A
     const connections = await generateConnectionsConfig([
         [
-            glueMainnetContract, // Chain A contract
+            // glueMainnetContract, // Chain A contract
+            baseSepoliaContract, // Chain A contract
             solanaContract, // Chain B contract
             [['LayerZero Labs'], []], // [ requiredDVN[], [ optionalDVN[], threshold ] ]
             [15, 32], // [A to B confirmations, B to A confirmations]
@@ -70,7 +72,7 @@ export default async function () {
     ])
 
     return {
-        contracts: [{ contract: glueMainnetContract }, { contract: solanaContract }],
+        contracts: [{ contract: baseSepoliaContract }, { contract: solanaContract }],
         connections,
     }
 }

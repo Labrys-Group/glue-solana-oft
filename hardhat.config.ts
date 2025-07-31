@@ -64,18 +64,18 @@ const config: HardhatUserConfig = {
         //     url: process.env.RPC_URL_SEPOLIA || 'https://gateway.tenderly.co/public/sepolia',
         //     accounts,
         // },
-        'glue-mainnet': {
-            eid: EndpointId.GLUE_V2_MAINNET,
-            // url: 'https://mainnet-node.m9.glue.net',
-            url: 'https://rpc.glue.net',
-            accounts,
-            gasPrice: 125000000000, // 125 gwei -- hardcoded because glue mainnet rpcs are munted
-        },
-        // 'base-sepolia': {
-        //     eid: EndpointId.BASESEP_V2_TESTNET,
-        //     url: 'https://84532.rpc.thirdweb.com',
+        // 'glue-mainnet': {
+        //     eid: EndpointId.GLUE_V2_MAINNET,
+        //     // url: 'https://mainnet-node.m9.glue.net',
+        //     url: 'https://rpc.glue.net',
         //     accounts,
+        //     gasPrice: 125000000000, // 125 gwei -- hardcoded because glue mainnet rpcs are munted
         // },
+        'base-sepolia': {
+            eid: EndpointId.BASESEP_V2_TESTNET,
+            url: 'https://84532.rpc.thirdweb.com',
+            accounts,
+        },
         hardhat: {
             // Need this for testing because TestHelperOz5.sol is exceeding the compiled contract size limit
             allowUnlimitedContractSize: true,

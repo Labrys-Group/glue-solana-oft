@@ -24,6 +24,18 @@ Tests CLI-related functionality including:
 - ✅ Command line argument parsing
 - ✅ Error handling and process exit
 
+### `get-nonce.test.ts`
+Tests the `getNextNonceOnSolana` function with:
+- ✅ Valid parameter validation
+- ✅ Source chain validation 
+- ✅ Address format validation
+- ✅ Error handling for all scenarios
+- ✅ Nonce querying via nextNonce function
+- ✅ Endpoint ID mapping validation
+- ✅ Case-insensitive chain names
+- ✅ Helpful error messages for read-only operations
+- ✅ Different output for first message vs existing nonces
+
 ### `setup.ts`
 Global test configuration that:
 - ✅ Mocks console methods to reduce noise

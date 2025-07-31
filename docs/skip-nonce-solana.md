@@ -330,14 +330,16 @@ connection.onLogs(
 4. **Documentation**: Document why each nonce was skipped
 5. **Multi-sig**: Consider requiring multiple signatures for skip operations
 
-## Ready-to-Use Script
+## Ready-to-Use Scripts
 
-We've provided a complete TypeScript script for skipping nonces on Solana:
+We've provided two complete TypeScript scripts for managing nonces on Solana:
 
-### Script Location
-- **File**: `scripts/skip-nonce.ts`
-- **Language**: TypeScript
-- **Focus**: Solana-specific nonce skipping
+### 1. Skip Nonce Script
+
+Complete TypeScript script for skipping nonces on Solana:
+
+**File**: `scripts/skip-nonce.ts`  
+**Purpose**: Skip a specific nonce to unblock message processing
 
 ### Usage
 
@@ -409,6 +411,87 @@ The script supports messages from these source chains:
 - **Mainnet**: ethereum, arbitrum, optimism, polygon, bsc, avalanche, base
 - **Testnet**: ethereum-sepolia, arbitrum-sepolia, optimism-sepolia, base-sepolia
 
+### 2. Get Nonce Script
+
+Complete TypeScript script for querying the next expected nonce on Solana:
+
+**File**: `scripts/get-nonce.ts`  
+**Purpose**: Query the next expected nonce for a message path (read-only)
+
+#### Usage
+
+```bash
+# Get next nonce on Solana mainnet
+npx ts-node scripts/get-nonce.ts \
+  --receiver 9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM \
+  --chain ethereum \
+  --sender 0x1234567890123456789012345678901234567890
+
+# Get next nonce on Solana devnet
+npx ts-node scripts/get-nonce.ts \
+  --receiver YOUR_SOLANA_RECEIVER_ADDRESS \
+  --chain ethereum \
+  --sender 0x1234567890123456789012345678901234567890 \
+  --devnet
+
+# Get next nonce on Solana testnet
+npx ts-node scripts/get-nonce.ts \
+  --receiver YOUR_SOLANA_RECEIVER_ADDRESS \
+  --chain sepolia \
+  --sender 0x1234567890123456789012345678901234567890 \
+  --testnet
+```
+
+#### Command Options
+
+- `-r, --receiver <address>` (required): Receiver address on Solana (OApp/OFT store)
+- `-c, --chain <chain>` (required): Source chain name (ethereum, arbitrum, optimism, etc.)
+- `-s, --sender <address>` (required): Sender address from source chain (0x... format)
+- `-u, --url <url>`: Solana RPC URL (default: mainnet-beta)
+- `--devnet`: Use Solana devnet
+- `--testnet`: Use Solana testnet
+
+#### Script Features
+
+1. **Read-Only Operation**: No keypair required, just queries the blockchain
+2. **Network Support**: Mainnet, devnet, and testnet support
+3. **Error Handling**: Helpful messages for missing accounts or invalid addresses
+4. **Connection Testing**: Verifies Solana connection before querying
+5. **Clear Output**: Shows current expected nonce with explanations
+
+#### Typical Workflow
+
+```bash
+# 1. Check current nonce before taking action
+npx ts-node scripts/get-nonce.ts \
+  --receiver YOUR_RECEIVER \
+  --chain ethereum \
+  --sender 0x123...
+
+# Output: Next expected nonce: 5
+# This means nonces 0-4 have been processed/skipped
+
+# 2. If needed, skip the stuck nonce
+npx ts-node scripts/skip-nonce.ts \
+  --receiver YOUR_RECEIVER \
+  --chain ethereum \
+  --sender 0x123... \
+  --nonce 5
+
+# 3. Verify the nonce was skipped
+npx ts-node scripts/get-nonce.ts \
+  --receiver YOUR_RECEIVER \
+  --chain ethereum \
+  --sender 0x123...
+
+# Output: Next expected nonce: 6
+```
+
 ## Conclusion
 
-The skip functionality in LayerZero V2 Solana SDK provides a critical recovery mechanism for cross-chain messaging. The provided TypeScript script makes it easy to skip nonces on Solana with proper error handling and confirmation. Use it judiciously and always ensure proper authorization and documentation when skipping nonces.
+The LayerZero V2 Solana SDK provides critical nonce management functionality for cross-chain messaging. The provided TypeScript scripts make it easy to both query and skip nonces on Solana:
+
+- **`get-nonce.ts`**: Query the next expected nonce (read-only, no keypair needed)
+- **`skip-nonce.ts`**: Skip a specific nonce to unblock message processing (requires admin/delegate permissions)
+
+Use the get-nonce script to check the current state before taking action, and the skip-nonce script judiciously with proper authorization and documentation when recovery is needed.

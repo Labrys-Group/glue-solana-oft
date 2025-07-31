@@ -12,10 +12,13 @@
     "lint:fix": "eslint --fix '**/*.{js,ts,json}' && prettier --write . && solhint 'contracts/**/*.sol' --fix --noPrompt",
     "lint:js": "eslint '**/*.{js,ts,json}' && prettier --check .",
     "lint:sol": "solhint 'contracts/**/*.sol'",
-    "test": "$npm_execpath run test:forge && $npm_execpath run test:hardhat",
+    "test": "$npm_execpath run test:forge && $npm_execpath run test:hardhat && $npm_execpath run test:unit",
     "test:anchor": "anchor test",
     "test:forge": "forge test",
-    "test:hardhat": "hardhat test"
+    "test:hardhat": "hardhat test",
+    "test:unit": "jest",
+    "test:unit:watch": "jest --watch",
+    "test:unit:coverage": "jest --coverage"
   },
   "resolutions": {
     "@solana/web3.js": "^1.98.0",
@@ -35,7 +38,7 @@
     "@layerzerolabs/lz-evm-messagelib-v2": "^3.0.86",
     "@layerzerolabs/lz-evm-protocol-v2": "^3.0.86",
     "@layerzerolabs/lz-evm-v1-0.7": "^3.0.86",
-    "@layerzerolabs/lz-solana-sdk-v2": "^3.0.86",
+    "@layerzerolabs/lz-solana-sdk-v2": "^3.0.118",
     "@layerzerolabs/lz-v2-utilities": "^3.0.86",
     "@layerzerolabs/metadata-tools": "^0.4.1",
     "@layerzerolabs/oapp-evm": "^0.3.2",
@@ -77,6 +80,7 @@
     "@types/jest": "^29.5.12",
     "@types/mocha": "^10.0.6",
     "@types/node": "~18.18.14",
+    "commander": "^12.0.0",
     "bs58": "^6.0.0",
     "chai": "^4.4.1",
     "concurrently": "~9.1.0",
@@ -96,6 +100,7 @@
     "prettier": "^3.2.5",
     "solhint": "^4.1.1",
     "solidity-bytes-utils": "^0.8.2",
+    "ts-jest": "^29.1.2",
     "ts-node": "^10.9.2",
     "typescript": "^5.4.4"
   },
