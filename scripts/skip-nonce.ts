@@ -472,7 +472,7 @@ async function skipNonceOnSolana(
         }
 
         const matches = DATA_DMP.filter((d) => d.pathway.srcEid === srcEid && d.pathway.nonce === nonceToSkip)
-        if (matches.length > 2) {
+        if (matches.length > 2 || matches.length === 0) {
             throw new Error(
                 `Found ${matches.length} matches for EID ${srcEid} and nonce ${nonceToSkip}. Expected 0 or 1 match.`
             )
