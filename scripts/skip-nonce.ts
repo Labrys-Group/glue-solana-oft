@@ -78,7 +78,7 @@ dotenv.config()
 // const ENDPOINT_PROGRAM_ID = new PublicKey('4riW6rPYZoHjyA57eXVTbkMxYS3yw6hDr9zxVWsZQ4oF') // Your devnet endpoint
 const ENDPOINT_PROGRAM_ID = new PublicKey('76y77prsiCMvXMjuoZ5VRrhG5qYBrUMYTE5WgHqgjEn6') // Official LayerZero mainnet
 
-const eid = 30342
+const eid = 30168
 
 async function skipNonceOnSolana(connection: Connection, payer: Keypair, nonceToSkip: number): Promise<string> {
     try {
@@ -104,16 +104,16 @@ async function skipNonceOnSolana(connection: Connection, payer: Keypair, nonceTo
         const endpoint = new EndpointProgram.Endpoint(ENDPOINT_PROGRAM_ID)
 
         // Convert addresses
-        const senderBytes = addressToBytes32(match.pathway.sender.address)
-        const senderPublicKey = new PublicKey(senderBytes)
+        const destBytes = addressToBytes32(match.pathway.sender.address)
+        const destinationPublicKey = new PublicKey(destBytes)
 
         // Create skip instruction
         console.log('\nCreating skip instruction...')
 
         const skipIx = await endpoint.skip(
             payer.publicKey,
-            senderPublicKey,
-            new PublicKey(match.pathway.receiver.address),
+            new PublicKey(match.pathway.sender.address),
+            destinationPublicKey,
             eid,
             nonceToSkip.toString()
         )
