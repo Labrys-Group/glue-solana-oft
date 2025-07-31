@@ -1,5 +1,59 @@
 #!/usr/bin/env ts-node
 
+/**
+ * LayerZero Skip Nonce Script for Solana
+ * 
+ * PURPOSE:
+ * This script skips stuck INBOUND nonces on Solana when cross-chain messages from other chains
+ * fail to deliver properly. It allows the LayerZero protocol to continue processing subsequent
+ * messages by marking a specific nonce as "skipped".
+ * 
+ * WHAT IT DOES:
+ * - Skips INBOUND nonces (messages coming INTO Solana from other chains)
+ * - Creates a nonce PDA based on: receiver (Solana OFT), source chain EID, and sender address
+ * - Tracks messages from Source Chain → Solana (not Solana → Source Chain)
+ * 
+ * NONCE TYPES EXPLAINED:
+ * - Inbound Nonce: Messages received BY Solana FROM other chains (what this script skips)
+ * - Outbound Nonce: Messages sent FROM Solana TO other chains (not handled by this script)
+ * 
+ * EXAMPLE USAGE:
+ * Skip nonce 8 for messages from Base Sepolia → Solana Devnet:
+ * ```
+ * npx ts-node scripts/skip-nonce.ts \
+ *   --receiver 36UH5YRWZnrR41SuD91zWmNp8zdEKMW9yDR3vyxpH5uQ \
+ *   --chain base-sepolia \
+ *   --sender 0xaac5842e11637c188aa34655b98918fecd615fee \
+ *   --nonce 8 \
+ *   --devnet
+ * ```
+ * 
+ * EXAMPLE OUTPUT INTERPRETATION:
+ * ```
+ * Current Nonce State:
+ *   - Inbound Nonce (received): 7    <- Messages received FROM base-sepolia TO solana
+ *   - Outbound Nonce (sent): 6       <- Messages sent FROM solana TO base-sepolia
+ *   - Attempting to skip: 8          <- Skipping inbound message #8 (base-sepolia → solana)
+ * ```
+ * 
+ * WHEN TO USE:
+ * - Message sent from Source Chain but never delivered to Solana
+ * - LayerZero pathway is stuck waiting for a specific nonce
+ * - Subsequent messages are blocked because of the missing nonce
+ * - You want to "give up" on a specific stuck message and continue processing
+ * 
+ * REQUIREMENTS:
+ * - Solana keypair with admin/delegate permissions for the OApp
+ * - Sufficient SOL for transaction fees
+ * - The nonce account must exist (created when first message is received)
+ * - Use the correct OFT store address (not wallet address) as receiver
+ * 
+ * IMPORTANT ADDRESSES:
+ * - Receiver should be the OFT store address from deployment files
+ * - Mainnet OFT: 5ekypahkmCtbQeu3nEvHyt5QriZNww5V3F42TKfSASqt
+ * - Testnet OFT: 36UH5YRWZnrR41SuD91zWmNp8zdEKMW9yDR3vyxpH5uQ
+ */
+
 import { readFileSync } from 'fs'
 
 import { createSignerFromKeypair, signerIdentity } from '@metaplex-foundation/umi'

@@ -4,15 +4,18 @@ import { Connection, PublicKey } from '@solana/web3.js'
 import { Command } from 'commander'
 import * as dotenv from 'dotenv'
 
-// Import using require to avoid TypeScript module resolution issues
-const { publicKey } = require('@metaplex-foundation/umi')
-
-const { EndpointPDA, fetchNonce, getEndpointProgramId } = require('@layerzerolabs/lz-solana-sdk-v2/umi')
+import { NONCE_SEED } from '@layerzerolabs/lz-solana-sdk-v2'
+import { addressToBytes32 } from '@layerzerolabs/lz-v2-utilities'
 
 // Load environment variables
 dotenv.config()
 
-// Chain endpoint IDs (same as skip-nonce.ts)
+// LayerZero V2 endpoint program ID
+// Use your custom endpoint for devnet/testnet
+// const ENDPOINT_PROGRAM_ID = new PublicKey('4riW6rPYZoHjyA57eXVTbkMxYS3yw6hDr9zxVWsZQ4oF') // Your devnet endpoint
+const ENDPOINT_PROGRAM_ID = new PublicKey('76y77prsiCMvXMjuoZ5VRrhG5qYBrUMYTE5WgHqgjEn6') // Official LayerZero mainnet
+
+// Chain endpoint IDs
 const ENDPOINT_IDS: Record<string, number> = {
     ethereum: 30101,
     'ethereum-mainnet': 30101,
@@ -35,6 +38,75 @@ const ENDPOINT_IDS: Record<string, number> = {
     'arbitrum-sepolia': 40231,
     'optimism-sepolia': 40232,
     'base-sepolia': 40245,
+
+    // Solana testnet EID for reference
+    'solana-testnet': 40168,
+    'solana-devnet': 40168,
+}
+
+/**
+ * Check the current nonce state for a LayerZero message path on Solana
+ * This function is based on the checkCurrentNonce method from skip-nonce.ts
+ */
+async function checkCurrentNonce(
+    connection: Connection,
+    receiverAddress: string,
+    sourceChain: string,
+    senderAddress: string
+): Promise<{ inboundNonce: number | null; outboundNonce: number | null; exists: boolean }> {
+    try {
+        const srcEid = ENDPOINT_IDS[sourceChain.toLowerCase()]
+        if (!srcEid) {
+            throw new Error(`Unknown source chain: ${sourceChain}`)
+        }
+
+        // Convert addresses to the format needed for PDA derivation
+        const senderBytes = addressToBytes32(senderAddress)
+        const receiverPublicKey = new PublicKey(receiverAddress)
+
+        // Derive the nonce PDA using LayerZero's pattern
+        const seeds = [
+            Buffer.from(NONCE_SEED, 'utf8'),
+            receiverPublicKey.toBuffer(),
+            Buffer.from(new Uint32Array([srcEid]).buffer).reverse(), // Big endian u32
+            Buffer.from(senderBytes),
+        ]
+
+        // Find the PDA using the endpoint program
+        const [noncePDA] = PublicKey.findProgramAddressSync(seeds, ENDPOINT_PROGRAM_ID)
+
+        console.log(`Checking nonce PDA: ${noncePDA.toBase58()}`)
+
+        // Try to fetch the nonce account
+        const accountInfo = await connection.getAccountInfo(noncePDA)
+        if (!accountInfo) {
+            return { inboundNonce: null, outboundNonce: null, exists: false }
+        }
+
+        // Parse the account data manually
+        // Nonce account structure: [discriminator: 8 bytes, bump: 1 byte, outbound: 8 bytes, inbound: 8 bytes]
+        const data = accountInfo.data
+        if (data.length < 25) {
+            console.warn('Account data too short to be a nonce account')
+            return { inboundNonce: null, outboundNonce: null, exists: false }
+        }
+
+        // Skip discriminator (8 bytes) and bump (1 byte), then read the nonces
+        const outboundNonce = Number(data.readBigUInt64LE(9)) // bytes 9-16
+        const inboundNonce = Number(data.readBigUInt64LE(17)) // bytes 17-24
+
+        return {
+            inboundNonce,
+            outboundNonce,
+            exists: true,
+        }
+    } catch (error: any) {
+        if (error.message?.includes('Unable to find Nonce account')) {
+            return { inboundNonce: null, outboundNonce: null, exists: false }
+        }
+        console.warn(`Warning: Failed to check nonce: ${error.message}`)
+        return { inboundNonce: null, outboundNonce: null, exists: false }
+    }
 }
 
 /**
@@ -64,79 +136,32 @@ async function getNextNonceOnSolana(
         console.log(`- RPC Endpoint: ${connection.rpcEndpoint}\n`)
 
         // Validate receiver address format
-        let receiverPublicKey: PublicKey
         try {
-            receiverPublicKey = new PublicKey(receiverAddress)
+            new PublicKey(receiverAddress)
         } catch (error) {
             throw new Error(`Invalid receiver address: ${receiverAddress}. Must be a valid Solana public key.`)
         }
 
-        console.log('Querying next expected nonce...')
+        console.log('Querying current nonce state...')
 
-        // Get LayerZero endpoint program ID and create PDA helper
-        // Use the correct endpoint program ID from anchor keys list
-        const endpointProgramId = publicKey('4riW6rPYZoHjyA57eXVTbkMxYS3yw6hDr9zxVWsZQ4oF')
-        const endpointPDA = new EndpointPDA(endpointProgramId)
-
-        // Convert sender address to Uint8Array (32 bytes for LayerZero)
-        let senderBytes: Uint8Array
-        if (senderAddress.startsWith('0x')) {
-            // Remove 0x prefix and convert hex to bytes, pad to 32 bytes
-            const hexStr = senderAddress.slice(2).padStart(64, '0')
-            senderBytes = new Uint8Array(Buffer.from(hexStr, 'hex'))
-        } else {
-            throw new Error('Sender address must be in 0x hex format for non-Solana chains')
-        }
-
-        // Convert receiver to UMI format and derive the nonce account PDA
-        const receiverUmi = publicKey(receiverAddress)
-        const nonceAccountPDA = endpointPDA.nonce(receiverUmi, srcEid, senderBytes)
-        console.log('Nonce account PDA:', nonceAccountPDA[0].toString())
-
-        // Query the nonce account directly
+        // Use the checkCurrentNonce method to get nonce information
+        const nonceResult = await checkCurrentNonce(connection, receiverAddress, sourceChain, senderAddress)
+        
         let expectedNonce: bigint
-        try {
-            const nonceAccount = await fetchNonce(connection, nonceAccountPDA[0], 'confirmed')
-            expectedNonce = nonceAccount ? nonceAccount.outboundNonce : BigInt(0)
-        } catch (accountError) {
-            // If account doesn't exist, nonce is 0 (first message)
-            console.log('Nonce account not found, assuming first message (nonce 0)')
+        if (!nonceResult.exists) {
+            console.log('Nonce account does not exist yet - next nonce will be 0')
             expectedNonce = BigInt(0)
-        }
-
-        console.log(`\n✅ Next expected nonce: ${expectedNonce}`)
-        console.log(`\nThis means:`)
-        console.log(`- The receiver is expecting nonce ${expectedNonce} next`)
-        if (expectedNonce > BigInt(0)) {
-            console.log(`- All nonces 0 to ${expectedNonce - BigInt(1)} have been processed or skipped`)
         } else {
-            console.log(`- This is the first message from this source chain/sender`)
+            // Account exists, use the inbound nonce as the next expected nonce
+            expectedNonce = BigInt(nonceResult.inboundNonce || 0)
+            console.log(`Current inbound nonce: ${nonceResult.inboundNonce}`)
+            console.log(`Current outbound nonce: ${nonceResult.outboundNonce}`)
         }
 
+        console.log(`\nNext expected nonce: ${expectedNonce}`)
         return expectedNonce
-    } catch (error: unknown) {
-        console.error('\n❌ Error querying nonce on Solana:')
-        console.error(error instanceof Error ? error.message : error)
-
-        // Provide helpful error messages specific to Solana
-        if (
-            (error instanceof Error && error.message?.includes('Account not found')) ||
-            (error instanceof Error && error.message?.includes('Account does not exist'))
-        ) {
-            console.error('\n💡 Solana-specific tips:')
-            console.error('- This could mean no messages have been sent from this source chain/sender yet')
-            console.error('- The receiver address might be incorrect')
-            console.error('- This would be the first message (nonce 0) for this path')
-        } else if (error instanceof Error && error.message?.includes('Invalid receiver address')) {
-            console.error('\n💡 Address format issue:')
-            console.error('- Make sure the receiver address is a valid Solana public key')
-            console.error('- Solana addresses are base58 encoded and ~44 characters long')
-        } else if (error instanceof Error && error.message?.includes('RPC')) {
-            console.error('\n💡 Connection issue:')
-            console.error('- Check your RPC URL is correct and accessible')
-            console.error('- Try using a different RPC endpoint')
-        }
-
+    } catch (error: any) {
+        console.error('Error getting next nonce:', error.message)
         throw error
     }
 }
@@ -206,8 +231,8 @@ async function main() {
     }
 }
 
-// Export the main function for use in other modules
-export { getNextNonceOnSolana }
+// Export the functions for use in other modules
+export { getNextNonceOnSolana, checkCurrentNonce }
 
 // Run the script if called directly
 if (require.main === module) {
