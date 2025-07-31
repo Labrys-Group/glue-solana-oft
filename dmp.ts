@@ -1,6 +1,4 @@
-import { LayerZeroMessage } from './scripts/skip-nonce'
-
-export const DATA_DMP: LayerZeroMessage[] = [
+export const DATA_DMP = [
     {
         pathway: {
             srcEid: 30342,
