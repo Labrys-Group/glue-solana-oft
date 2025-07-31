@@ -104,7 +104,7 @@ async function skipNonceOnSolana(connection: Connection, payer: Keypair, nonceTo
         const endpoint = new EndpointProgram.Endpoint(ENDPOINT_PROGRAM_ID)
 
         // Convert addresses
-        const destBytes = addressToBytes32(match.pathway.sender.address)
+        const destBytes = addressToBytes32(match.pathway.receiver.address)
         const destinationPublicKey = new PublicKey(destBytes)
 
         // Create skip instruction
