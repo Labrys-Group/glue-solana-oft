@@ -59,7 +59,6 @@
 import { createHash } from 'crypto'
 import { readFileSync } from 'fs'
 
-import { bs58 } from '@coral-xyz/anchor/dist/cjs/utils/bytes'
 import { createSignerFromKeypair, signerIdentity } from '@metaplex-foundation/umi'
 import { createUmi } from '@metaplex-foundation/umi-bundle-defaults'
 import { fromWeb3JsKeypair } from '@metaplex-foundation/umi-web3js-adapters'
@@ -79,7 +78,7 @@ dotenv.config()
 // const ENDPOINT_PROGRAM_ID = new PublicKey('4riW6rPYZoHjyA57eXVTbkMxYS3yw6hDr9zxVWsZQ4oF') // Your devnet endpoint
 const ENDPOINT_PROGRAM_ID = new PublicKey('76y77prsiCMvXMjuoZ5VRrhG5qYBrUMYTE5WgHqgjEn6') // Official LayerZero mainnet
 
-const eid = 30168
+const eid = 30342
 
 async function skipNonceOnSolana(connection: Connection, payer: Keypair, nonceToSkip: number): Promise<string> {
     try {
