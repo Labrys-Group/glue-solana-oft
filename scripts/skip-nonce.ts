@@ -56,12 +56,14 @@
  * - Testnet OFT: 36UH5YRWZnrR41SuD91zWmNp8zdEKMW9yDR3vyxpH5uQ
  */
 
+import { createHash } from 'crypto'
 import { readFileSync } from 'fs'
 
+import { bs58 } from '@coral-xyz/anchor/dist/cjs/utils/bytes'
 import { createSignerFromKeypair, signerIdentity } from '@metaplex-foundation/umi'
 import { createUmi } from '@metaplex-foundation/umi-bundle-defaults'
 import { fromWeb3JsKeypair } from '@metaplex-foundation/umi-web3js-adapters'
-import { Connection, Keypair, PublicKey, Transaction } from '@solana/web3.js'
+import { Connection, Keypair, PublicKey, SendTransactionError, Transaction } from '@solana/web3.js'
 import { Command } from 'commander'
 import * as dotenv from 'dotenv'
 
@@ -77,7 +79,71 @@ dotenv.config()
 const ENDPOINT_PROGRAM_ID = new PublicKey('76y77prsiCMvXMjuoZ5VRrhG5qYBrUMYTE5WgHqgjEn6') // Official LayerZero mainnet
 
 // LayerZero constants
-const PENDING_NONCE_SEED = 'PendingInboundNonce'
+const PENDING_NONCE_SEED = 'PendingNonce'
+
+// Function to compute discriminator (first 8 bytes of SHA-256)
+function computeDiscriminator(instructionName: string): string {
+    const hash = createHash('sha256').update(`global:${instructionName}`).digest('hex')
+    return hash.slice(0, 16) // First 8 bytes = 16 hex chars
+}
+
+// Known LayerZero Solana instruction discriminators (computed accurately)
+const knownDiscriminators: Record<string, string> = {
+    [computeDiscriminator('skip')]: 'skip',
+    [computeDiscriminator('send')]: 'send',
+    [computeDiscriminator('verify')]: 'verify',
+    [computeDiscriminator('quote')]: 'quote',
+    [computeDiscriminator('clear')]: 'clear',
+    [computeDiscriminator('nilify')]: 'nilify',
+    [computeDiscriminator('lz_receive')]: 'lz_receive',
+    [computeDiscriminator('burn')]: 'burn',
+    [computeDiscriminator('init_config')]: 'init_config',
+    [computeDiscriminator('set_config')]: 'set_config',
+    [computeDiscriminator('init_nonce')]: 'init_nonce',
+    [computeDiscriminator('register_oapp')]: 'register_oapp',
+    [computeDiscriminator('set_delegate')]: 'set_delegate',
+    [computeDiscriminator('init_verify')]: 'init_verify',
+    [computeDiscriminator('send_compose')]: 'send_compose',
+    [computeDiscriminator('clear_compose')]: 'clear_compose',
+    // Add more LayerZero instructions as needed
+}
+
+// Debug: Log computed discriminators (remove in production)
+console.log('🔍 Computed Discriminators:')
+console.log(`  skip: ${computeDiscriminator('skip')}`)
+console.log(`  send: ${computeDiscriminator('send')}`)
+console.log(`  verify: ${computeDiscriminator('verify')}`)
+console.log(`  quote: ${computeDiscriminator('quote')}`)
+console.log('')
+
+// Helper function to decode discriminator to readable string
+function decodeDiscriminator(discriminator: Buffer): string {
+    const hex = discriminator.toString('hex')
+
+    const instructionName = knownDiscriminators[hex]
+    if (instructionName) {
+        return `${instructionName} (${hex})`
+    }
+
+    // Try to decode as ASCII if it's printable
+    let asciiAttempt = ''
+    let isPrintable = true
+    for (let i = 0; i < discriminator.length; i++) {
+        const byte = discriminator[i]
+        if (byte >= 32 && byte <= 126) {
+            asciiAttempt += String.fromCharCode(byte)
+        } else {
+            isPrintable = false
+            break
+        }
+    }
+
+    if (isPrintable && asciiAttempt.length > 0) {
+        return `"${asciiAttempt}" (${hex})`
+    }
+
+    return `unknown (${hex})`
+}
 
 // Chain endpoint IDs
 const ENDPOINT_IDS: Record<string, number> = {
@@ -121,6 +187,10 @@ async function checkCurrentNonce(
     pendingExists: boolean
     mainNoncePDA: string
     pendingNoncePDA: string
+    payloadHashPDA: string
+    eventAuthorityPDA: string
+    payloadHashExists: boolean
+    eventAuthorityExists: boolean
 }> {
     try {
         const srcEid = ENDPOINT_IDS[sourceChain.toLowerCase()]
@@ -148,23 +218,45 @@ async function checkCurrentNonce(
             Buffer.from(senderBytes),
         ]
 
-        // Find both PDAs using the endpoint program
+        // Derive the payload hash PDA (not needed in checkCurrentNonce, will be handled in skipNonceOnSolana)
+
+        // Derive the event authority PDA
+        const eventAuthoritySeeds = [Buffer.from('__event_authority', 'utf8')]
+
+        // Find all required PDAs using the endpoint program
         const [mainNoncePDA] = PublicKey.findProgramAddressSync(mainNonceSeeds, ENDPOINT_PROGRAM_ID)
         const [pendingNoncePDA] = PublicKey.findProgramAddressSync(pendingNonceSeeds, ENDPOINT_PROGRAM_ID)
 
+        // Derive payload hash and event authority PDAs (will be used in skipNonceOnSolana)
+        const _payloadHashSeeds = [
+            Buffer.from('PayloadHash', 'utf8'),
+            receiverPublicKey.toBuffer(),
+            Buffer.from(new Uint32Array([srcEid]).buffer).reverse(), // Big endian u32
+            Buffer.from(senderBytes),
+        ]
+        const [_payloadHashPDA] = PublicKey.findProgramAddressSync(_payloadHashSeeds, ENDPOINT_PROGRAM_ID)
+        const [eventAuthorityPDA] = PublicKey.findProgramAddressSync(eventAuthoritySeeds, ENDPOINT_PROGRAM_ID)
+
         console.log(`\n🔍 Account Analysis:`)
         console.log(`├─ Main Nonce PDA: ${mainNoncePDA.toBase58()}`)
-        console.log(`└─ Pending Inbound Nonce PDA: ${pendingNoncePDA.toBase58()}`)
+        console.log(`├─ Pending Inbound Nonce PDA: ${pendingNoncePDA.toBase58()}`)
+        console.log(`├─ Payload Hash PDA: ${_payloadHashPDA.toBase58()}`)
+        console.log(`└─ Event Authority PDA: ${eventAuthorityPDA.toBase58()}`)
 
-        // Try to fetch both accounts
+        // Try to fetch the main accounts
         const [mainAccountInfo, pendingAccountInfo] = await connection.getMultipleAccountsInfo([
             mainNoncePDA,
             pendingNoncePDA,
         ])
 
+        // Check payload hash and event authority accounts (simplified for now)
+        const eventAuthorityInfo = await connection.getAccountInfo(eventAuthorityPDA)
+
         let inboundNonce = null,
             outboundNonce = null,
             exists = false
+        const payloadHashExists = false
+        const eventAuthorityExists = Boolean(eventAuthorityInfo)
         if (mainAccountInfo) {
             exists = true
             // Parse the main nonce account data manually
@@ -174,33 +266,37 @@ async function checkCurrentNonce(
                 // Skip discriminator (8 bytes) and bump (1 byte), then read the nonces
                 outboundNonce = Number(data.readBigUInt64LE(9)) // bytes 9-16
                 inboundNonce = Number(data.readBigUInt64LE(17)) // bytes 17-24
-                console.log(`✅ Main Nonce Account: FOUND (${data.length} bytes)`)
+                console.log(` Main Nonce Account: FOUND (${data.length} bytes)`)
             } else {
-                console.warn(`⚠️  Main Nonce Account: Too short (${data.length} bytes)`)
+                console.warn(`  Main Nonce Account: Too short (${data.length} bytes)`)
             }
         } else {
-            console.log(`❌ Main Nonce Account: NOT FOUND`)
+            console.log(` Main Nonce Account: NOT FOUND`)
         }
 
         let pendingInboundNonce = null,
             pendingExists = false
         if (pendingAccountInfo) {
             pendingExists = true
-            // Parse pending inbound nonce account (structure may be different)
+            // Parse the pending nonce account data manually
+            // Pending nonce account structure: [discriminator: 8 bytes, bump: 1 byte, nonce: 8 bytes]
             const data = pendingAccountInfo.data
-            console.log(`✅ Pending Inbound Nonce Account: FOUND (${data.length} bytes)`)
-
-            // Try to parse as u64 at different offsets to find the nonce value
-            if (data.length >= 16) {
-                // Try different offsets to find the nonce value
-                try {
-                    pendingInboundNonce = Number(data.readBigUInt64LE(8)) // Skip discriminator
-                } catch (e) {
-                    console.warn(`⚠️  Could not parse pending nonce data`)
-                }
+            if (data.length >= 17) {
+                pendingInboundNonce = Number(data.readBigUInt64LE(9)) // bytes 9-16
+                console.log(` Pending Inbound Nonce Account: FOUND (${data.length} bytes)`)
+            } else {
+                console.warn(`  Pending Inbound Nonce Account: Too short (${data.length} bytes)`)
             }
         } else {
-            console.log(`❌ Pending Inbound Nonce Account: NOT FOUND`)
+            console.log(` Pending Inbound Nonce Account: NOT FOUND`)
+        }
+
+        // Check event authority account (simplified check)
+        const _eventAuthorityExists = Boolean(eventAuthorityInfo)
+        if (eventAuthorityInfo) {
+            console.log(` Event Authority Account: FOUND (${eventAuthorityInfo.data.length} bytes)`)
+        } else {
+            console.log(` Event Authority Account: NOT FOUND`)
         }
 
         return {
@@ -211,17 +307,25 @@ async function checkCurrentNonce(
             pendingExists,
             mainNoncePDA: mainNoncePDA.toBase58(),
             pendingNoncePDA: pendingNoncePDA.toBase58(),
+            payloadHashPDA: _payloadHashPDA.toBase58(),
+            eventAuthorityPDA: eventAuthorityPDA.toBase58(),
+            payloadHashExists: false,
+            eventAuthorityExists,
         }
-    } catch (error: any) {
-        console.warn(`Warning: Failed to check nonce: ${error.message}`)
+    } catch (error: unknown) {
+        console.warn(`Warning: Failed to check nonce: ${error instanceof Error ? error.message : String(error)}`)
         return {
             inboundNonce: null,
             outboundNonce: null,
             exists: false,
             pendingInboundNonce: null,
             pendingExists: false,
-            mainNoncePDA: 'unknown',
-            pendingNoncePDA: 'unknown',
+            mainNoncePDA: '',
+            pendingNoncePDA: '',
+            payloadHashPDA: '',
+            eventAuthorityPDA: '',
+            payloadHashExists: false,
+            eventAuthorityExists: false,
         }
     }
 }
@@ -305,6 +409,22 @@ async function skipNonceOnSolana(
         }
         console.log(`└─ Attempting to skip: ${nonceToSkip}`)
 
+        // Validate all required accounts exist
+        const missingAccounts = []
+        if (!nonceState.exists) missingAccounts.push('Main Nonce Account')
+        if (!nonceState.pendingExists) missingAccounts.push('Pending Inbound Nonce Account')
+        if (!nonceState.payloadHashExists) missingAccounts.push('Payload Hash Account')
+        if (!nonceState.eventAuthorityExists) missingAccounts.push('Event Authority Account')
+
+        if (missingAccounts.length > 0) {
+            console.log(`\n❌ Cannot skip nonce ${nonceToSkip} - Missing accounts:`)
+            missingAccounts.forEach((account) => console.log(`   - ${account}`))
+            console.log('\n🔍 This indicates the message was never properly received on Solana')
+            console.log('   The skip instruction requires all these accounts to exist')
+            console.log('   Check if the message was actually sent from the source chain')
+            throw new Error(`Cannot skip nonce - missing required accounts: ${missingAccounts.join(', ')}`)
+        }
+
         // Validate the nonce to skip
         if (nonceState.inboundNonce !== null && nonceToSkip > nonceState.inboundNonce + 1) {
             console.log(
@@ -321,7 +441,9 @@ async function skipNonceOnSolana(
         console.log(`\n🎯 Skip Instruction Will Use:`)
         console.log(`├─ Main Nonce Account: ${nonceState.mainNoncePDA}`)
         console.log(`├─ Pending Inbound Nonce Account: ${nonceState.pendingNoncePDA}`)
-        console.log(`└─ This will skip INBOUND nonce ${nonceToSkip} (${sourceChain} → Solana)`)
+        console.log(`├─ Payload Hash Account: ${nonceState.payloadHashPDA}`)
+        console.log(`└─ Event Authority Account: ${nonceState.eventAuthorityPDA}`)
+        console.log(`   This will skip INBOUND nonce ${nonceToSkip} (${sourceChain} → Solana)`)
 
         // Create skip instruction
         console.log('\nCreating skip instruction...')
@@ -332,6 +454,124 @@ async function skipNonceOnSolana(
             srcEid,
             nonceToSkip.toString()
         )
+
+        console.log(skipIx)
+        // Decode the skip instruction data
+        console.log('\n📋 Skip Instruction Analysis:')
+        if (skipIx && skipIx.data) {
+            const data = skipIx.data
+            console.log(`├─ Instruction Data Length: ${data.length} bytes`)
+            console.log(`├─ Raw Data (hex): ${data.toString('hex')}`)
+            console.log(`├─ Raw Data (base58): ${bs58.encode(data)}`)
+
+            // Decode the skip instruction structure based on LayerZero's format
+            if (data.length >= 8) {
+                // First 8 bytes are the discriminator
+                const discriminator = data.subarray(0, 8)
+                const discriminatorDecoded = decodeDiscriminator(discriminator)
+                console.log(`├─ Discriminator: ${discriminatorDecoded}`)
+                console.log(`│  └─ Base58: ${bs58.encode(discriminator)}`)
+
+                if (data.length >= 40) {
+                    // 8 + 32 bytes for receiver
+                    // Next 32 bytes should be the receiver public key
+                    const receiver = data.subarray(8, 40)
+                    console.log(`├─ Receiver: ${bs58.encode(receiver)}`)
+
+                    if (data.length >= 44) {
+                        // + 4 bytes for srcEid
+                        // Next 4 bytes should be srcEid (u32)
+                        const srcEidBytes = data.subarray(40, 44)
+                        const srcEidValue = srcEidBytes.readUInt32LE(0)
+                        console.log(`├─ Source EID: ${srcEidValue}`)
+
+                        if (data.length >= 76) {
+                            // + 32 bytes for sender
+                            // Next 32 bytes should be the sender address
+                            const sender = data.subarray(44, 76)
+                            console.log(`├─ Sender: 0x${sender.toString('hex')}`)
+
+                            if (data.length >= 84) {
+                                // + 8 bytes for nonce
+                                // Next 8 bytes should be the nonce (u64)
+                                const nonceBytes = data.subarray(76, 84)
+                                const nonceValue = nonceBytes.readBigUInt64LE(0)
+                                console.log(`└─ Nonce to Skip: ${nonceValue}`)
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
+            console.log('└─ No instruction data available')
+        }
+
+        // Analyze all accounts used in the skip instruction
+        if (skipIx && skipIx.keys && skipIx.keys.length > 0) {
+            console.log('\n🔑 Skip Instruction Accounts:')
+
+            // Get account info for all keys in the instruction
+            const accountKeys = skipIx.keys.map((key) => key.pubkey)
+            const accountInfos = await connection.getMultipleAccountsInfo(accountKeys)
+
+            for (let i = 0; i < skipIx.keys.length; i++) {
+                const accountMeta = skipIx.keys[i]
+                const accountInfo = accountInfos[i]
+                const isLast = i === skipIx.keys.length - 1
+                const prefix = isLast ? '└─' : '├─'
+
+                console.log(`${prefix} Account ${i + 1}: ${accountMeta.pubkey.toBase58()}`)
+                console.log(`${isLast ? '   ' : '│  '}├─ Signer: ${accountMeta.isSigner}`)
+                console.log(`${isLast ? '   ' : '│  '}├─ Writable: ${accountMeta.isWritable}`)
+
+                if (accountInfo) {
+                    console.log(`${isLast ? '   ' : '│  '}├─ Owner: ${accountInfo.owner.toBase58()}`)
+                    console.log(`${isLast ? '   ' : '│  '}├─ Data Length: ${accountInfo.data.length} bytes`)
+                    console.log(`${isLast ? '   ' : '│  '}├─ Lamports: ${accountInfo.lamports}`)
+
+                    // Try to identify the account type based on owner and data
+                    let accountType = 'Unknown'
+                    if (accountInfo.owner.equals(ENDPOINT_PROGRAM_ID)) {
+                        if (accountInfo.data.length === 25) {
+                            accountType = 'Nonce Account'
+                        } else if (accountInfo.data.length > 0) {
+                            // Try to decode discriminator for LayerZero accounts
+                            const discriminator = accountInfo.data.subarray(0, 8)
+                            const hex = discriminator.toString('hex')
+
+                            // Known LayerZero account discriminators (computed)
+                            const knownAccounts: Record<string, string> = {
+                                [computeDiscriminator('Nonce')]: 'Nonce',
+                                [computeDiscriminator('PendingInboundNonce')]: 'PendingInboundNonce',
+                                [computeDiscriminator('OAppRegistry')]: 'OAppRegistry',
+                                [computeDiscriminator('PayloadHash')]: 'PayloadHash',
+                                [computeDiscriminator('EndpointSettings')]: 'EndpointSettings',
+                                [computeDiscriminator('SendLibraryConfig')]: 'SendLibraryConfig',
+                                [computeDiscriminator('ReceiveLibraryConfig')]: 'ReceiveLibraryConfig',
+                                [computeDiscriminator('MessageLibInfo')]: 'MessageLibInfo',
+                                [computeDiscriminator('ComposeMessageState')]: 'ComposeMessageState',
+                                // Add more LayerZero account types as needed
+                            }
+
+                            const knownType = knownAccounts[hex]
+                            if (knownType) {
+                                accountType = `LayerZero ${knownType}`
+                            } else {
+                                accountType = `LayerZero Account (${hex})`
+                            }
+                        }
+                    } else if (accountInfo.owner.equals(new PublicKey('11111111111111111111111111111111'))) {
+                        accountType = 'System Account'
+                    } else {
+                        accountType = 'Program Account'
+                    }
+
+                    console.log(`${isLast ? '   ' : '│  '}└─ Type: ${accountType}`)
+                } else {
+                    console.log(`${isLast ? '   ' : '│  '}└─ Status: NOT FOUND`)
+                }
+            }
+        }
 
         if (!skipIx) {
             throw new Error('Failed to create skip instruction')
@@ -348,14 +588,54 @@ async function skipNonceOnSolana(
 
         // Send transaction
         console.log('Sending skip transaction...')
-        const signature = await connection.sendTransaction(transaction, [payer], {
-            skipPreflight: false,
-            preflightCommitment: 'confirmed',
-            maxRetries: 3,
-        })
+        let signature: string
+        try {
+            signature = await connection.sendTransaction(transaction, [payer], {
+                skipPreflight: false,
+                preflightCommitment: 'confirmed',
+                maxRetries: 3,
+            })
 
-        console.log(`Transaction sent: ${signature}`)
-        console.log(`Explorer: https://solscan.io/tx/${signature}`)
+            console.log(`Transaction sent: ${signature}`)
+            console.log(`Explorer: https://solscan.io/tx/${signature}`)
+        } catch (error) {
+            if (error instanceof SendTransactionError) {
+                console.error('\n❌ SendTransactionError occurred:')
+                console.error(`Message: ${error.message}`)
+
+                // Get detailed logs from the transaction error
+                try {
+                    const logs = await error.getLogs(connection)
+                    console.error('\n📜 Transaction Logs:')
+                    if (logs && logs.length > 0) {
+                        logs.forEach((log, index) => {
+                            console.error(`  ${index + 1}. ${log}`)
+                        })
+                    } else {
+                        console.error('  No logs available')
+                    }
+                } catch (logError) {
+                    console.error(`Failed to get transaction logs: ${logError}`)
+                }
+
+                // Try to extract signature from error message or use any available signature info
+                let txSignature: string | null = null
+
+                // Check if the error message contains a signature pattern
+                const signatureMatch = error.message.match(/[1-9A-HJ-NP-Za-km-z]{87,88}/)
+                if (signatureMatch) {
+                    txSignature = signatureMatch[0]
+                }
+
+                if (txSignature) {
+                    console.error(`\nFailed transaction signature: ${txSignature}`)
+                    console.error(`Explorer: https://solscan.io/tx/${txSignature}`)
+                } else {
+                    console.error('\nNo transaction signature available in error')
+                }
+            }
+            throw error
+        }
 
         // Wait for confirmation
         console.log('\nWaiting for confirmation...')
