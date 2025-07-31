@@ -80,6 +80,11 @@ const ENDPOINT_PROGRAM_ID = new PublicKey('76y77prsiCMvXMjuoZ5VRrhG5qYBrUMYTE5Wg
 
 const eid = 30168
 
+// Sender - EVM
+// Solan - Rust
+//
+// EVM -> RUST
+
 async function skipNonceOnSolana(connection: Connection, payer: Keypair, nonceToSkip: number): Promise<string> {
     try {
         console.log('=== Skip Nonce on Solana ===\n')
@@ -92,6 +97,8 @@ async function skipNonceOnSolana(connection: Connection, payer: Keypair, nonceTo
         }
 
         const match = matches[0]
+        const sender = match.pathway.sender.address
+        const receiver = match.pathway.receiver.address
 
         // const value =
 
@@ -104,16 +111,29 @@ async function skipNonceOnSolana(connection: Connection, payer: Keypair, nonceTo
         const endpoint = new EndpointProgram.Endpoint(ENDPOINT_PROGRAM_ID)
 
         // Convert addresses
-        const srcBytes = addressToBytes32(match.pathway.sender.address)
+        const srcBytes = addressToBytes32(sender)
         const senderPubKey = new PublicKey(srcBytes)
 
         // Create skip instruction
         console.log('\nCreating skip instruction...')
 
+        const payloadHashIx = await endpoint.initVerify(
+            connection,
+            payer.publicKey,
+            senderPubKey,
+            new PublicKey(receiver),
+            eid,
+            nonceToSkip.toString()
+        )
+
+        if (!payloadHashIx) {
+            throw new Error('Failed to create payload hash instruction')
+        }
+
         const skipIx = await endpoint.skip(
             payer.publicKey,
             senderPubKey,
-            new PublicKey(match.pathway.receiver.address),
+            new PublicKey(receiver),
             eid,
             nonceToSkip.toString()
         )
@@ -126,7 +146,7 @@ async function skipNonceOnSolana(connection: Connection, payer: Keypair, nonceTo
 
         // Create transaction with the skip instruction
         const web3Instruction = skipIx
-        const transaction = new Transaction().add(web3Instruction)
+        const transaction = new Transaction().add(payloadHashIx).add(web3Instruction)
 
         // Get recent blockhash
         const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed')
