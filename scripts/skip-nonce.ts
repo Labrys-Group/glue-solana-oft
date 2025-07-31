@@ -2,21 +2,23 @@
 
 /**
  * LayerZero Skip Nonce Script for Solana
- * 
+ *
  * PURPOSE:
  * This script skips stuck INBOUND nonces on Solana when cross-chain messages from other chains
  * fail to deliver properly. It allows the LayerZero protocol to continue processing subsequent
  * messages by marking a specific nonce as "skipped".
- * 
+ *
  * WHAT IT DOES:
  * - Skips INBOUND nonces (messages coming INTO Solana from other chains)
- * - Creates a nonce PDA based on: receiver (Solana OFT), source chain EID, and sender address
- * - Tracks messages from Source Chain → Solana (not Solana → Source Chain)
- * 
+ * - Works with TWO nonce accounts:
+ *   1. Main Nonce Account (seed: "Nonce") - tracks both inbound/outbound nonces
+ *   2. Pending Inbound Nonce Account (seed: "PendingNonce") - tracks pending inbound nonces
+ * - Both PDAs based on: receiver (Solana OFT), source chain EID, and sender address
+ *
  * NONCE TYPES EXPLAINED:
  * - Inbound Nonce: Messages received BY Solana FROM other chains (what this script skips)
  * - Outbound Nonce: Messages sent FROM Solana TO other chains (not handled by this script)
- * 
+ *
  * EXAMPLE USAGE:
  * Skip nonce 8 for messages from Base Sepolia → Solana Devnet:
  * ```
@@ -27,7 +29,7 @@
  *   --nonce 8 \
  *   --devnet
  * ```
- * 
+ *
  * EXAMPLE OUTPUT INTERPRETATION:
  * ```
  * Current Nonce State:
@@ -35,19 +37,19 @@
  *   - Outbound Nonce (sent): 6       <- Messages sent FROM solana TO base-sepolia
  *   - Attempting to skip: 8          <- Skipping inbound message #8 (base-sepolia → solana)
  * ```
- * 
+ *
  * WHEN TO USE:
  * - Message sent from Source Chain but never delivered to Solana
  * - LayerZero pathway is stuck waiting for a specific nonce
  * - Subsequent messages are blocked because of the missing nonce
  * - You want to "give up" on a specific stuck message and continue processing
- * 
+ *
  * REQUIREMENTS:
  * - Solana keypair with admin/delegate permissions for the OApp
  * - Sufficient SOL for transaction fees
  * - The nonce account must exist (created when first message is received)
  * - Use the correct OFT store address (not wallet address) as receiver
- * 
+ *
  * IMPORTANT ADDRESSES:
  * - Receiver should be the OFT store address from deployment files
  * - Mainnet OFT: 5ekypahkmCtbQeu3nEvHyt5QriZNww5V3F42TKfSASqt
@@ -73,6 +75,9 @@ dotenv.config()
 // Use your custom endpoint for devnet/testnet
 // const ENDPOINT_PROGRAM_ID = new PublicKey('4riW6rPYZoHjyA57eXVTbkMxYS3yw6hDr9zxVWsZQ4oF') // Your devnet endpoint
 const ENDPOINT_PROGRAM_ID = new PublicKey('76y77prsiCMvXMjuoZ5VRrhG5qYBrUMYTE5WgHqgjEn6') // Official LayerZero mainnet
+
+// LayerZero constants
+const PENDING_NONCE_SEED = 'PendingInboundNonce'
 
 // Chain endpoint IDs
 const ENDPOINT_IDS: Record<string, number> = {
@@ -108,7 +113,15 @@ async function checkCurrentNonce(
     receiverAddress: string,
     sourceChain: string,
     senderAddress: string
-): Promise<{ inboundNonce: number | null; outboundNonce: number | null; exists: boolean }> {
+): Promise<{
+    inboundNonce: number | null
+    outboundNonce: number | null
+    exists: boolean
+    pendingInboundNonce: number | null
+    pendingExists: boolean
+    mainNoncePDA: string
+    pendingNoncePDA: string
+}> {
     try {
         const srcEid = ENDPOINT_IDS[sourceChain.toLowerCase()]
         if (!srcEid) {
@@ -119,48 +132,97 @@ async function checkCurrentNonce(
         const senderBytes = addressToBytes32(senderAddress)
         const receiverPublicKey = new PublicKey(receiverAddress)
 
-        // Derive the nonce PDA using LayerZero's pattern
-        const seeds = [
+        // Derive the main nonce PDA using LayerZero's pattern
+        const mainNonceSeeds = [
             Buffer.from(NONCE_SEED, 'utf8'),
             receiverPublicKey.toBuffer(),
             Buffer.from(new Uint32Array([srcEid]).buffer).reverse(), // Big endian u32
             Buffer.from(senderBytes),
         ]
 
-        // Find the PDA using the endpoint program
-        const [noncePDA] = PublicKey.findProgramAddressSync(seeds, ENDPOINT_PROGRAM_ID)
+        // Derive the pending inbound nonce PDA
+        const pendingNonceSeeds = [
+            Buffer.from(PENDING_NONCE_SEED, 'utf8'),
+            receiverPublicKey.toBuffer(),
+            Buffer.from(new Uint32Array([srcEid]).buffer).reverse(), // Big endian u32
+            Buffer.from(senderBytes),
+        ]
 
-        console.log(`Checking nonce PDA: ${noncePDA.toBase58()}`)
+        // Find both PDAs using the endpoint program
+        const [mainNoncePDA] = PublicKey.findProgramAddressSync(mainNonceSeeds, ENDPOINT_PROGRAM_ID)
+        const [pendingNoncePDA] = PublicKey.findProgramAddressSync(pendingNonceSeeds, ENDPOINT_PROGRAM_ID)
 
-        // Try to fetch the nonce account
-        const accountInfo = await connection.getAccountInfo(noncePDA)
-        if (!accountInfo) {
-            return { inboundNonce: null, outboundNonce: null, exists: false }
+        console.log(`\n🔍 Account Analysis:`)
+        console.log(`├─ Main Nonce PDA: ${mainNoncePDA.toBase58()}`)
+        console.log(`└─ Pending Inbound Nonce PDA: ${pendingNoncePDA.toBase58()}`)
+
+        // Try to fetch both accounts
+        const [mainAccountInfo, pendingAccountInfo] = await connection.getMultipleAccountsInfo([
+            mainNoncePDA,
+            pendingNoncePDA,
+        ])
+
+        let inboundNonce = null,
+            outboundNonce = null,
+            exists = false
+        if (mainAccountInfo) {
+            exists = true
+            // Parse the main nonce account data manually
+            // Nonce account structure: [discriminator: 8 bytes, bump: 1 byte, outbound: 8 bytes, inbound: 8 bytes]
+            const data = mainAccountInfo.data
+            if (data.length >= 25) {
+                // Skip discriminator (8 bytes) and bump (1 byte), then read the nonces
+                outboundNonce = Number(data.readBigUInt64LE(9)) // bytes 9-16
+                inboundNonce = Number(data.readBigUInt64LE(17)) // bytes 17-24
+                console.log(`✅ Main Nonce Account: FOUND (${data.length} bytes)`)
+            } else {
+                console.warn(`⚠️  Main Nonce Account: Too short (${data.length} bytes)`)
+            }
+        } else {
+            console.log(`❌ Main Nonce Account: NOT FOUND`)
         }
 
-        // Parse the account data manually
-        // Nonce account structure: [discriminator: 8 bytes, bump: 1 byte, outbound: 8 bytes, inbound: 8 bytes]
-        const data = accountInfo.data
-        if (data.length < 25) {
-            console.warn('Account data too short to be a nonce account')
-            return { inboundNonce: null, outboundNonce: null, exists: false }
-        }
+        let pendingInboundNonce = null,
+            pendingExists = false
+        if (pendingAccountInfo) {
+            pendingExists = true
+            // Parse pending inbound nonce account (structure may be different)
+            const data = pendingAccountInfo.data
+            console.log(`✅ Pending Inbound Nonce Account: FOUND (${data.length} bytes)`)
 
-        // Skip discriminator (8 bytes) and bump (1 byte), then read the nonces
-        const outboundNonce = Number(data.readBigUInt64LE(9)) // bytes 9-16
-        const inboundNonce = Number(data.readBigUInt64LE(17)) // bytes 17-24
+            // Try to parse as u64 at different offsets to find the nonce value
+            if (data.length >= 16) {
+                // Try different offsets to find the nonce value
+                try {
+                    pendingInboundNonce = Number(data.readBigUInt64LE(8)) // Skip discriminator
+                } catch (e) {
+                    console.warn(`⚠️  Could not parse pending nonce data`)
+                }
+            }
+        } else {
+            console.log(`❌ Pending Inbound Nonce Account: NOT FOUND`)
+        }
 
         return {
             inboundNonce,
             outboundNonce,
-            exists: true,
+            exists,
+            pendingInboundNonce,
+            pendingExists,
+            mainNoncePDA: mainNoncePDA.toBase58(),
+            pendingNoncePDA: pendingNoncePDA.toBase58(),
         }
     } catch (error: any) {
-        if (error.message?.includes('Unable to find Nonce account')) {
-            return { inboundNonce: null, outboundNonce: null, exists: false }
-        }
         console.warn(`Warning: Failed to check nonce: ${error.message}`)
-        return { inboundNonce: null, outboundNonce: null, exists: false }
+        return {
+            inboundNonce: null,
+            outboundNonce: null,
+            exists: false,
+            pendingInboundNonce: null,
+            pendingExists: false,
+            mainNoncePDA: 'unknown',
+            pendingNoncePDA: 'unknown',
+        }
     }
 }
 
@@ -218,7 +280,7 @@ async function skipNonceOnSolana(
         const nonceState = await checkCurrentNonce(connection, receiverAddress, sourceChain, senderAddress)
 
         if (!nonceState.exists) {
-            console.log('❌ Nonce Account Status: NOT FOUND')
+            console.log('❌ Main Nonce Account Status: NOT FOUND')
             console.log('💡 This means:')
             console.log('  - No messages have been received from this pathway yet')
             console.log(`  - No messages from ${sourceChain} → Solana`)
@@ -232,11 +294,16 @@ async function skipNonceOnSolana(
             throw new Error('Nonce account does not exist - no messages received from this pathway')
         }
 
-        console.log('✅ Nonce Account Status: FOUND')
-        console.log('📊 Current Nonce State:')
-        console.log(`  - Inbound Nonce (received): ${nonceState.inboundNonce}`)
-        console.log(`  - Outbound Nonce (sent): ${nonceState.outboundNonce}`)
-        console.log(`  - Attempting to skip: ${nonceToSkip}`)
+        console.log('\n📊 Current Nonce State:')
+        console.log(`├─ Main Nonce Account:`)
+        console.log(`│  ├─ Inbound Nonce (FROM ${sourceChain} TO Solana): ${nonceState.inboundNonce}`)
+        console.log(`│  └─ Outbound Nonce (FROM Solana TO ${sourceChain}): ${nonceState.outboundNonce}`)
+        if (nonceState.pendingExists) {
+            console.log(`├─ Pending Inbound Nonce Account: ${nonceState.pendingInboundNonce}`)
+        } else {
+            console.log(`├─ Pending Inbound Nonce Account: NOT FOUND`)
+        }
+        console.log(`└─ Attempting to skip: ${nonceToSkip}`)
 
         // Validate the nonce to skip
         if (nonceState.inboundNonce !== null && nonceToSkip > nonceState.inboundNonce + 1) {
@@ -249,6 +316,12 @@ async function skipNonceOnSolana(
                 `\n⚠️  Warning: Trying to skip nonce ${nonceToSkip} but it may already be processed (current: ${nonceState.inboundNonce})`
             )
         }
+
+        // Show what accounts the skip instruction will use
+        console.log(`\n🎯 Skip Instruction Will Use:`)
+        console.log(`├─ Main Nonce Account: ${nonceState.mainNoncePDA}`)
+        console.log(`├─ Pending Inbound Nonce Account: ${nonceState.pendingNoncePDA}`)
+        console.log(`└─ This will skip INBOUND nonce ${nonceToSkip} (${sourceChain} → Solana)`)
 
         // Create skip instruction
         console.log('\nCreating skip instruction...')
