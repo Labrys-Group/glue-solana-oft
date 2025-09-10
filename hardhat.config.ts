@@ -64,7 +64,7 @@ const config: HardhatUserConfig = {
         //     url: process.env.RPC_URL_SEPOLIA || 'https://gateway.tenderly.co/public/sepolia',
         //     accounts,
         // },
-        'glue-mainnet': {
+        glue: {
             eid: EndpointId.GLUE_V2_MAINNET,
             // url: 'https://mainnet-node.m9.glue.net',
             url: 'https://rpc.glue.net',

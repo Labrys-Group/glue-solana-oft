@@ -2,15 +2,17 @@ import assert from 'assert'
 
 import { type DeployFunction } from 'hardhat-deploy/types'
 
-const contractName = 'gOFT'
+const contractName = 'bonkSOL'
 
 ////// UPDATE THESE VALUES //////
 const tokenConfig = {
-    name: 'Hosico Cat',
-    symbol: 'HOSICO',
-    decimals: 6,
+    name: 'bonkSOL',
+    symbol: 'bonkSOL',
+    decimals: 18,
 }
 ////// UPDATE THESE VALUES //////
+
+const OWNER = '0x72f9A355e48F228B72c4e8FA90bD91c3eC0bC868'
 
 const deploy: DeployFunction = async (hre) => {
     const { getNamedAccounts, deployments } = hre
@@ -26,8 +28,9 @@ const deploy: DeployFunction = async (hre) => {
     const endpointV2Deployment = await hre.deployments.get('EndpointV2')
 
     const { address } = await deploy(contractName, {
+        contract: 'gOFT',
         from: deployer,
-        args: [tokenConfig.name, tokenConfig.symbol, endpointV2Deployment.address, deployer, tokenConfig.decimals],
+        args: [tokenConfig.name, tokenConfig.symbol, endpointV2Deployment.address, OWNER, tokenConfig.decimals],
         log: true,
         skipIfAlreadyDeployed: false,
     })
