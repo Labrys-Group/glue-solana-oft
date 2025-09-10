@@ -36,6 +36,38 @@ import { OftPDA } from '@layerzerolabs/oft-v2-solana-sdk'
 import { DebugLogger, KnownErrors, createSolanaConnectionFactory } from '../common/utils'
 import getFee from '../utils/getFee'
 
+export const addComputeUnitInstructions = async (
+    connection: Connection,
+    umi: Umi,
+    eid: EndpointId,
+    txBuilder: TransactionBuilder,
+    umiWalletSigner: KeypairSigner,
+    computeUnitPriceScaleFactor: number,
+    transactionType: TransactionType
+) => {
+    const computeUnitLimitScaleFactor = 1.1 // hardcoded to 1.1 as the estimations are not perfect and can fall slightly short of the actual CU usage on-chain
+    const { addressLookupTableInput, lookupTableAccount } = await getAddressLookupTable(connection, umi, eid)
+    const { computeUnitPrice, computeUnits } = await getComputeUnitPriceAndLimit(
+        connection,
+        txBuilder.getInstructions(),
+        umiWalletSigner,
+        lookupTableAccount,
+        transactionType
+    )
+    // Since transaction builders are immutable, we must be careful to always assign the result of the add and prepend
+    // methods to a new variable.
+    const newTxBuilder = transactionBuilder()
+        .add(
+            setComputeUnitPrice(umi, {
+                microLamports: computeUnitPrice * BigInt(Math.floor(computeUnitPriceScaleFactor)),
+            })
+        )
+        .add(setComputeUnitLimit(umi, { units: computeUnits * computeUnitLimitScaleFactor }))
+        .setAddressLookupTables([addressLookupTableInput])
+        .add(txBuilder)
+    return newTxBuilder
+}
+
 const LOOKUP_TABLE_ADDRESS: Partial<Record<EndpointId, PublicKey>> = {
     [EndpointId.SOLANA_V2_MAINNET]: publicKey('AokBxha6VMLLgf97B5VYHEtqztamWmYERBmmFvjuTzJB'),
     [EndpointId.SOLANA_V2_TESTNET]: publicKey('9thqPdbR27A1yLWw2spwJLySemiGMXxPnEvfmXVk4KuK'),
@@ -126,6 +158,10 @@ async function getSolanaKeypair(readOnly = false): Promise<Keypair> {
     }
 
     // Otherwise, default path is the last fallback
+    if (!keypairDefaultPath) {
+        throw new Error('No valid keypair found. Please set up a Solana keypair.')
+    }
+
     logger.info(
         `No environment-based keypair found. Found keypair at default path => ${keypairDefaultPath.publicKey.toBase58()}`
     )
@@ -359,34 +395,4 @@ export const getComputeUnitPriceAndLimit = async (
     }
 }
 
-export const addComputeUnitInstructions = async (
-    connection: Connection,
-    umi: Umi,
-    eid: EndpointId,
-    txBuilder: TransactionBuilder,
-    umiWalletSigner: KeypairSigner,
-    computeUnitPriceScaleFactor: number,
-    transactionType: TransactionType
-) => {
-    const computeUnitLimitScaleFactor = 1.1 // hardcoded to 1.1 as the estimations are not perfect and can fall slightly short of the actual CU usage on-chain
-    const { addressLookupTableInput, lookupTableAccount } = await getAddressLookupTable(connection, umi, eid)
-    const { computeUnitPrice, computeUnits } = await getComputeUnitPriceAndLimit(
-        connection,
-        txBuilder.getInstructions(),
-        umiWalletSigner,
-        lookupTableAccount,
-        transactionType
-    )
-    // Since transaction builders are immutable, we must be careful to always assign the result of the add and prepend
-    // methods to a new variable.
-    const newTxBuilder = transactionBuilder()
-        .add(
-            setComputeUnitPrice(umi, {
-                microLamports: computeUnitPrice * BigInt(Math.floor(computeUnitPriceScaleFactor)),
-            })
-        )
-        .add(setComputeUnitLimit(umi, { units: computeUnits * computeUnitLimitScaleFactor }))
-        .setAddressLookupTables([addressLookupTableInput])
-        .add(txBuilder)
-    return newTxBuilder
-}
+

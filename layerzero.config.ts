@@ -5,32 +5,14 @@ import { OAppEnforcedOption, OmniPointHardhat } from '@layerzerolabs/toolbox-har
 
 import { getOftStoreAddress } from './tasks/solana'
 
-// Note:  Do not use address for EVM OmniPointHardhat contracts.  Contracts are loaded using hardhat-deploy.
-// If you do use an address, ensure artifacts exists.
-// const sepoliaContract: OmniPointHardhat = {
-//     eid: EndpointId.SEPOLIA_V2_TESTNET,
-//     contractName: 'MyOFT',
-// }
-
-// const GLUE_V2_MAINNET_EID = 30342
-
 const glueMainnetContract: OmniPointHardhat = {
     eid: EndpointId.GLUE_V2_MAINNET,
     contractName: 'gOFT',
 }
 
-// const baseSepoliaContract: OmniPointHardhat = {
-//     eid: EndpointId.BASESEP_V2_TESTNET,
-//     contractName: 'gOFT',
-// }
-
-// const SOLANA_MAINNET_EID = 30168
-
 const solanaContract: OmniPointHardhat = {
     eid: EndpointId.SOLANA_V2_MAINNET,
     address: getOftStoreAddress(EndpointId.SOLANA_V2_MAINNET),
-    // eid: EndpointId.SOLANA_V2_TESTNET,
-    // address: getOftStoreAddress(EndpointId.SOLANA_V2_TESTNET),
 }
 
 const EVM_ENFORCED_OPTIONS: OAppEnforcedOption[] = [
