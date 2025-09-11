@@ -112,6 +112,8 @@ interface CreateOFTTaskArgs {
     uri: string
 
     computeUnitPriceScaleFactor: number
+
+    contractName: string
 }
 
 // Define a Hardhat task for creating OFT on Solana
@@ -121,6 +123,7 @@ interface CreateOFTTaskArgs {
 // * Set the mint authority to the multisig account. If not in only OFT Store mode, also set the freeze authority to the multisig account.
 // Note:  Only supports SPL Token Standard.
 task('lz:oft:solana:create', 'Mints new SPL Token and creates new OFT Store account')
+    .addParam('contractName', 'the filename for the deployment artifacts')
     .addOptionalParam('amount', 'The initial supply to mint on solana', undefined, devtoolsTypes.int)
     .addParam('eid', 'Solana mainnet (30168) or testnet (40168)', undefined, devtoolsTypes.eid)
     .addOptionalParam('localDecimals', 'Token local decimals (default=9)', DEFAULT_LOCAL_DECIMALS, devtoolsTypes.int)
@@ -148,6 +151,7 @@ task('lz:oft:solana:create', 'Mints new SPL Token and creates new OFT Store acco
     .addParam('computeUnitPriceScaleFactor', 'The compute unit price scale factor', 4, devtoolsTypes.float, true)
     .setAction(
         async ({
+            contractName,
             amount,
             eid,
             localDecimals: decimals,
@@ -333,7 +337,8 @@ task('lz:oft:solana:create', 'Mints new SPL Token and creates new OFT Store acco
                 mint.publicKey,
                 mintAuthorityPublicKey.toBase58(),
                 escrowPK,
-                oftStorePda
+                oftStorePda,
+                contractName
             )
         }
     )
