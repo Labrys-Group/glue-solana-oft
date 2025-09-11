@@ -14,7 +14,7 @@ import { ERC_20_ABI } from '../../helpers/erc-20'
 import { deriveConnection, getSolanaDeployment } from '../solana'
 
 interface LzConfigExportTaskArgs {
-    configFile: string
+    oappConfig: string
 }
 
 // EID to Network ID mapping
@@ -88,9 +88,9 @@ const getEVMContractDetails = async (contractAddress: string, rpcUrl: string) =>
     }
 }
 
-const getSolanaTokenDetails = async (eid: EndpointId, contractName?: string) => {
+const getSolanaTokenDetails = async (eid: EndpointId, contractName: string) => {
     try {
-        const deployment = getSolanaDeployment(eid, contractName || 'OFT.json')
+        const deployment = getSolanaDeployment(eid, contractName)
         const rpcUrl = EID_TO_RPC[eid]
 
         if (!rpcUrl) {
@@ -135,12 +135,12 @@ const isSolanaEID = (eid: number): boolean => {
 }
 
 task('lz:oapp:db-export', 'Exports a lz config file to a JSON object for the lz-tokens collection in database')
-    .addParam('configFile', 'the filepath for the lz config (e.g. `configs/bonksol-lz.config.ts`)')
-    .setAction(async ({ configFile }: LzConfigExportTaskArgs) => {
-        console.log(`Processing config file: ${configFile}`)
+    .addParam('oappConfig', 'the filepath for the lz config (e.g. `configs/bonksol-lz.config.ts`)')
+    .setAction(async ({ oappConfig }: LzConfigExportTaskArgs) => {
+        console.log(`Processing config file: ${oappConfig}`)
 
         // Dynamically import the config file
-        const fullConfigPath = path.resolve(configFile)
+        const fullConfigPath = path.resolve(oappConfig)
         if (!fs.existsSync(fullConfigPath)) {
             throw new Error(`Config file not found: ${fullConfigPath}`)
         }
@@ -173,7 +173,7 @@ task('lz:oapp:db-export', 'Exports a lz config file to a JSON object for the lz-
             try {
                 const solanaDeployment = getSolanaDeployment(
                     solanaContract.contract.eid,
-                    solanaContract.contract.contractName || 'OFT.json'
+                    solanaContract.contract.contractName
                 )
                 sharedCoinGeckoData = await getCoinGeckoTokenData(solanaDeployment.mint, 'solana')
                 console.log(`Fetched CoinGecko data: assetId=${sharedCoinGeckoData.assetId}`)
@@ -225,7 +225,7 @@ task('lz:oapp:db-export', 'Exports a lz config file to a JSON object for the lz-
                                 try {
                                     const remoteDeployment = getSolanaDeployment(
                                         remoteContract.eid,
-                                        remoteContract.contractName || 'OFT.json'
+                                        remoteContract.contractName
                                     )
                                     remoteAddress = remoteDeployment.programId
                                 } catch (error) {
@@ -307,7 +307,7 @@ task('lz:oapp:db-export', 'Exports a lz config file to a JSON object for the lz-
                                 try {
                                     const remoteDeployment = getSolanaDeployment(
                                         remoteContract.eid,
-                                        remoteContract.contractName || 'OFT.json'
+                                        remoteContract.contractName
                                     )
                                     remoteAddress = remoteDeployment.programId
                                 } catch (error) {

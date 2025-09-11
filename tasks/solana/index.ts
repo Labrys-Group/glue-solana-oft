@@ -267,7 +267,7 @@ export const saveSolanaDeployment = (
  */
 export const getSolanaDeployment = (
     eid: EndpointId,
-    contractName = 'OFT.json'
+    contractName: string
 ): {
     programId: string
     mint: string
@@ -280,7 +280,7 @@ export const getSolanaDeployment = (
     }
     const outputDir = path.join('deployments', endpointIdToNetwork(eid))
 
-    const filePath = path.join(outputDir, contractName) // Note: if you have multiple deployments, change this filename to refer to the desired deployment file
+    const filePath = path.join(outputDir, `${contractName}-oft.json`) // Note: if you have multiple deployments, change this filename to refer to the desired deployment file
 
     if (!existsSync(filePath)) {
         DebugLogger.printErrorAndFixSuggestion(KnownErrors.SOLANA_DEPLOYMENT_NOT_FOUND)
@@ -291,7 +291,7 @@ export const getSolanaDeployment = (
     return JSON.parse(fileContents)
 }
 
-export const getOftStoreAddress = (eid: EndpointId, contractName = 'OFT.json') => {
+export const getOftStoreAddress = (eid: EndpointId, contractName: string) => {
     const { oftStore } = getSolanaDeployment(eid, contractName)
     if (!oftStore) {
         throw new Error('oftStore not defined in the deployment file')

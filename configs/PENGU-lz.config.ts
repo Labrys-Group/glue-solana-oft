@@ -14,7 +14,8 @@ const glueMainnetContract: OmniPointHardhat = {
 
 const solanaContract: OmniPointHardhat = {
     eid: EndpointId.SOLANA_V2_MAINNET,
-    address: getOftStoreAddress(EndpointId.SOLANA_V2_MAINNET, `${contractName}-oft.json`),
+    address: getOftStoreAddress(EndpointId.SOLANA_V2_MAINNET, `${contractName}`),
+    contractName,
 }
 
 const EVM_ENFORCED_OPTIONS: OAppEnforcedOption[] = [

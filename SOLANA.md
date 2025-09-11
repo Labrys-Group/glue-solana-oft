@@ -53,3 +53,55 @@ token program: `TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA`
 ```
 
 ```
+
+# Top to bottom
+
+1. Deploy the OFT on glue (change the gOFT.ts file), by running:
+
+```bash
+pnpm hardhat deploy --tags <TAG_NAME> --network glue-mainnet
+```
+
+IMPORTANT!! Check the decimals you need
+
+2. Deploy the OFT Adapter on solana with:
+
+```bash
+pnpm hardhat lz:oft-adapter:solana:create
+  --eid 30168
+  --program-id 7aJdnmHwaRWU4E9Fz5dREB8XiwDDxb4Jz3E2FvjGRnso
+  --mint <TOKEN_MINT>
+  --token-program <TOKEN_PROGRAM_ID>
+```
+
+this will output a file <TAG_NAME>-oft.json to the `deployments/solana-mainnet/*` directory.
+
+2. Create the `configs/<TAG_NAME>-lz.config.ts` file from the `configs/EMPTY-lz.config.ts` file. In `-lz.config.ts`just change the `contractName` parameter to whatever `contractName` is in `deploy/gOFT.ts`
+
+3. Initialise the LZ OApp by running:
+
+```bash
+pnpm hardhat lz:oft:solana:init-config --oapp-config configs/<TAG_NAME>-lz.config.ts
+```
+
+4. Wire up the LZ Oapp
+
+```bash
+pnpm hardhat lz:oapp:wire --oapp-config --oapp-config configs/<TAG_NAME>-lz.config.ts
+```
+
+5. Generate the DB Files
+
+```bash
+pnpm hardhat lz:oapp:db-export --oapp-config <PATH_TO_CONFIG>
+```
+
+6. Test in the UI
+
+Insert into the dev database and test these pathways through the UI.
+
+Always guarantee that:
+
+- the sent amount on chain A == the received amount on chain B
+
+Then send it back.
