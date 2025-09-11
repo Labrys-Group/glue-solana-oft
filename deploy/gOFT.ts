@@ -2,12 +2,12 @@ import assert from 'assert'
 
 import { type DeployFunction } from 'hardhat-deploy/types'
 
-const contractName = 'bonkSOL'
+const contractName = 'PENGU'
 
 ////// UPDATE THESE VALUES //////
 const tokenConfig = {
-    name: 'bonkSOL',
-    symbol: 'bonkSOL',
+    name: 'Pudgy Penguins',
+    symbol: 'PENGU',
     decimals: 18,
 }
 ////// UPDATE THESE VALUES //////

@@ -39,6 +39,8 @@ interface CreateOFTAdapterTaskArgs {
     tokenProgram: string
 
     computeUnitPriceScaleFactor: number
+
+    contractName: string
 }
 
 // Define a Hardhat task for creating OFTAdapter on Solana
@@ -47,6 +49,7 @@ task('lz:oft-adapter:solana:create', 'Creates new OFT Adapter (OFT Store PDA)')
     .addParam('programId', 'The OFT program ID')
     .addParam('eid', 'Solana mainnet (30168) or testnet (40168)', undefined, devtoolsTypes.eid)
     .addParam('tokenProgram', 'The Token Program public key', TOKEN_PROGRAM_ID.toBase58(), devtoolsTypes.string, true)
+    .addParam('contractName', 'what you call this token (e.g. PENGU)')
     .addParam('computeUnitPriceScaleFactor', 'The compute unit price scale factor', 4, devtoolsTypes.float, true)
     .setAction(
         async ({
@@ -55,6 +58,7 @@ task('lz:oft-adapter:solana:create', 'Creates new OFT Adapter (OFT Store PDA)')
             programId: programIdStr,
             tokenProgram: tokenProgramStr,
             computeUnitPriceScaleFactor,
+            contractName,
         }: CreateOFTAdapterTaskArgs) => {
             const { connection, umi, umiWalletKeyPair, umiWalletSigner } = await deriveConnection(eid)
             const { programId, lockBox, escrowPK, oftStorePda, eddsa } = deriveKeys(programIdStr)
@@ -100,7 +104,8 @@ task('lz:oft-adapter:solana:create', 'Creates new OFT Adapter (OFT Store PDA)')
                 mint,
                 mintAuthority ? mintAuthority.toBase58() : '',
                 escrowPK,
-                oftStorePda
+                oftStorePda,
+                contractName
             )
         }
     )

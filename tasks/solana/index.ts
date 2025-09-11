@@ -237,14 +237,14 @@ export const saveSolanaDeployment = (
     mintAuthority: string,
     escrow: string,
     oftStore: string,
-    contractName = 'OFT.json'
+    contractName = 'OFT-00'
 ) => {
     const outputDir = `./deployments/${endpointIdToNetwork(eid)}`
     if (!existsSync(outputDir)) {
         mkdirSync(outputDir, { recursive: true })
     }
     writeFileSync(
-        `${outputDir}/${contractName}`,
+        `${outputDir}/${contractName}-oft.json`,
         JSON.stringify(
             {
                 programId,
@@ -257,7 +257,7 @@ export const saveSolanaDeployment = (
             4
         )
     )
-    console.log(`Accounts have been saved to ${outputDir}/OFT.json`)
+    console.log(`Accounts have been saved to ${outputDir}/${contractName}-oft.json`)
 }
 
 /**
