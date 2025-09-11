@@ -210,7 +210,7 @@ task('lz:oapp:db-export', 'Exports a lz config file to a JSON object for the lz-
                     assetId: sharedCoinGeckoData.assetId,
                     name: solanaDetails.name,
                     symbol: solanaDetails.symbol,
-                    address: contract.address || solanaDetails.mint,
+                    address: solanaDetails.programId,
                     decimals: solanaDetails.decimals,
                     networkId: networkId,
                     endpointId: eid,
@@ -299,7 +299,8 @@ task('lz:oapp:db-export', 'Exports a lz config file to a JSON object for the lz-
                         .filter((c: { contract: { eid: number } }) => c.contract.eid !== eid)
                         .map((c: { contract: { eid: number; address?: string; contractName?: string } }) => {
                             const remoteContract = c.contract
-                            let remoteAddress = remoteContract.address || ''
+
+                            let remoteAddress
 
                             // For Solana contracts, use the mint address if no address is specified
                             if (isSolanaEID(remoteContract.eid) && !remoteAddress) {
@@ -308,7 +309,7 @@ task('lz:oapp:db-export', 'Exports a lz config file to a JSON object for the lz-
                                         remoteContract.eid,
                                         remoteContract.contractName || 'OFT.json'
                                     )
-                                    remoteAddress = remoteDeployment.mint
+                                    remoteAddress = remoteDeployment.programId
                                 } catch (error) {
                                     console.warn(
                                         `Failed to get remote Solana deployment for EID ${remoteContract.eid}:`,
@@ -339,8 +340,9 @@ task('lz:oapp:db-export', 'Exports a lz config file to a JSON object for the lz-
                                 endpointId: remoteContract.eid,
                             }
                         }),
+                    // TODO make isProxy and tokenAddress only these on glue
                     isProxy: false,
-                    tokenAddress: contractAddress || '0x0000000000000000000000000000000000000000',
+                    tokenAddress: '0x0000000000000000000000000000000000000000',
                     image: sharedCoinGeckoData.image,
                 }
             }

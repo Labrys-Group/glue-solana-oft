@@ -8,11 +8,11 @@
   "endpointId": 30342,
   "remoteChains": [
     {
-      "address": "HEkTphAqSpx1WXCixBCTeKR4YwwkEAgUkCLqz85ziPyL",
+      "address": "7aJdnmHwaRWU4E9Fz5dREB8XiwDDxb4Jz3E2FvjGRnso",
       "endpointId": 30168
     }
   ],
   "isProxy": false,
-  "tokenAddress": "0x1530537C191e00878BB2e714b5cf62CD5c9c894B",
+  "tokenAddress": "0x0000000000000000000000000000000000000000",
   "image": "https://coin-images.coingecko.com/coins/images/37473/large/bonksol.jpg?1751787827"
 }
