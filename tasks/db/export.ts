@@ -1,12 +1,17 @@
-import { ethers } from 'ethers'
 import fs from 'fs'
-import { task } from 'hardhat/config'
 import path from 'path'
+
+import { fetchMetadataFromSeeds } from '@metaplex-foundation/mpl-token-metadata'
+import { publicKey } from '@metaplex-foundation/umi'
+import { getMint } from '@solana/spl-token'
+import { PublicKey } from '@solana/web3.js'
+import { ethers } from 'ethers'
+import { task } from 'hardhat/config'
 
 import { EndpointId } from '@layerzerolabs/lz-definitions'
 
 import { ERC_20_ABI } from '../../helpers/erc-20'
-import { getSolanaDeployment } from '../solana'
+import { deriveConnection, getSolanaDeployment } from '../solana'
 
 interface LzConfigExportTaskArgs {
     configFile: string
@@ -15,14 +20,58 @@ interface LzConfigExportTaskArgs {
 // EID to Network ID mapping
 const EID_TO_NETWORK_ID: Record<number, number> = {
     30168: 101, // Solana Mainnet
-    40168: 103, // Solana Testnet
     30342: 1300, // Glue Mainnet
 }
 
 // EID to RPC URL mapping
+// EID to network name mapping for deployment files
+const EID_TO_NETWORK_NAME: Record<number, string> = {
+    30342: 'glue-mainnet',
+    30168: 'solana-mainnet',
+    // Add more as needed
+}
+
 const EID_TO_RPC: Record<number, string> = {
     30342: 'https://rpc.glue.net',
+    30168: 'https://api.mainnet-beta.solana.com', // Solana Mainnet
     // Add more as needed
+}
+
+const getEVMContractAddress = (eid: EndpointId, contractName: string): string => {
+    try {
+        const networkName = EID_TO_NETWORK_NAME[eid]
+        if (!networkName) {
+            throw new Error(`No network name mapping for EID ${eid}`)
+        }
+
+        const deploymentPath = path.join(process.cwd(), 'deployments', networkName, `${contractName}.json`)
+        if (!fs.existsSync(deploymentPath)) {
+            throw new Error(`Deployment file not found: ${deploymentPath}`)
+        }
+
+        const deployment = JSON.parse(fs.readFileSync(deploymentPath, 'utf8'))
+        return deployment.address || ''
+    } catch (error) {
+        console.error(error)
+        throw new Error(`Failed to get EVM contract address for ${contractName} on EID ${eid}:`)
+    }
+}
+
+const getCoinGeckoTokenData = async (contractAddress: string, platform = 'solana') => {
+    try {
+        const response = await fetch(`https://api.coingecko.com/api/v3/coins/${platform}/contract/${contractAddress}`)
+        if (!response.ok) {
+            throw new Error(`CoinGecko API returned ${response.status}`)
+        }
+        const data = await response.json()
+        return {
+            assetId: data.id || '',
+            image: data.image?.large || data.image?.small || '',
+        }
+    } catch (error) {
+        console.error(error)
+        throw new Error(`Failed to get EVM contract address for ${contractAddress} on platform ${platform}:`)
+    }
 }
 
 const getEVMContractDetails = async (contractAddress: string, rpcUrl: string) => {
@@ -42,27 +91,42 @@ const getEVMContractDetails = async (contractAddress: string, rpcUrl: string) =>
 const getSolanaTokenDetails = async (eid: EndpointId, contractName?: string) => {
     try {
         const deployment = getSolanaDeployment(eid, contractName || 'OFT.json')
+        const rpcUrl = EID_TO_RPC[eid]
 
-        // For now, we'll use placeholder values since we'd need to fetch from Solana RPC
-        // This could be enhanced to fetch actual token metadata from Solana
+        if (!rpcUrl) {
+            throw new Error(`No RPC URL configured for EID ${eid}`)
+        }
+
+        const { connection, umi } = await deriveConnection(eid)
+        const mintPublicKey = new PublicKey(deployment.mint)
+
+        // Fetch mint account info for decimals
+        const mintInfo = await getMint(connection, mintPublicKey)
+
+        // Fetch metadata using Metaplex
+        let name = ''
+        let symbol = ''
+
+        try {
+            const mintUmi = publicKey(deployment.mint)
+            const metadata = await fetchMetadataFromSeeds(umi, { mint: mintUmi })
+            name = metadata.name
+            symbol = metadata.symbol
+        } catch (metadataError) {
+            console.error(metadataError)
+            throw new Error('Error getting spl metadata')
+        }
+
         return {
-            name: '',
-            symbol: '',
-            decimals: 9,
+            name,
+            symbol,
+            decimals: mintInfo.decimals,
             mint: deployment.mint,
             escrow: deployment.escrow,
             programId: deployment.programId,
         }
     } catch (error) {
-        console.warn(`Failed to fetch Solana token details for EID ${eid}:`, error)
-        return {
-            name: '',
-            symbol: '',
-            decimals: 9,
-            mint: '',
-            escrow: '',
-            programId: '',
-        }
+        throw new Error('Failed to get SOL token details')
     }
 }
 
@@ -102,6 +166,23 @@ task('lz:oapp:db-export', 'Exports a lz config file to a JSON object for the lz-
             fs.mkdirSync(constantsDir, { recursive: true })
         }
 
+        // First, get CoinGecko data from the Solana token (only once)
+        let sharedCoinGeckoData = { assetId: '', image: '' }
+        const solanaContract = config.contracts.find((c: { contract: { eid: number } }) => isSolanaEID(c.contract.eid))
+        if (solanaContract) {
+            try {
+                const solanaDeployment = getSolanaDeployment(
+                    solanaContract.contract.eid,
+                    solanaContract.contract.contractName || 'OFT.json'
+                )
+                sharedCoinGeckoData = await getCoinGeckoTokenData(solanaDeployment.mint, 'solana')
+                console.log(`Fetched CoinGecko data: assetId=${sharedCoinGeckoData.assetId}`)
+            } catch (error) {
+                console.error('Failed to fetch CoinGecko data from Solana token:', error)
+                throw new Error('Error getting sol token')
+            }
+        }
+
         // Process each contract
         for (const contractWrapper of config.contracts) {
             const contract = contractWrapper.contract
@@ -115,18 +196,18 @@ task('lz:oapp:db-export', 'Exports a lz config file to a JSON object for the lz-
 
             console.log(`Processing contract for EID ${eid} (Network ID: ${networkId})`)
 
-            let outputData: any
+            let outputData
             let tokenSymbol = 'UNKNOWN'
 
             if (isSolanaEID(eid)) {
                 // Handle Solana contract
                 const solanaDetails = await getSolanaTokenDetails(eid, contract.contractName)
 
-                // Try to extract symbol from contract name or use default
-                tokenSymbol = contract.contractName || 'SOL'
+                // Try to extract symbol from metadata or contract name
+                tokenSymbol = solanaDetails.symbol || contract.contractName || 'SOL'
 
                 outputData = {
-                    assetId: '',
+                    assetId: sharedCoinGeckoData.assetId,
                     name: solanaDetails.name,
                     symbol: solanaDetails.symbol,
                     address: contract.address || solanaDetails.mint,
@@ -134,11 +215,49 @@ task('lz:oapp:db-export', 'Exports a lz config file to a JSON object for the lz-
                     networkId: networkId,
                     endpointId: eid,
                     remoteChains: config.contracts
-                        .filter((c: any) => c.contract.eid !== eid)
-                        .map((c: any) => ({
-                            address: c.contract.address || '',
-                            endpointId: c.contract.eid,
-                        })),
+                        .filter((c: { contract: { eid: number } }) => c.contract.eid !== eid)
+                        .map((c: { contract: { eid: number; address?: string; contractName?: string } }) => {
+                            const remoteContract = c.contract
+                            let remoteAddress = remoteContract.address || ''
+
+                            // For Solana contracts, use the programId
+                            if (isSolanaEID(remoteContract.eid) && !remoteAddress) {
+                                try {
+                                    const remoteDeployment = getSolanaDeployment(
+                                        remoteContract.eid,
+                                        remoteContract.contractName || 'OFT.json'
+                                    )
+                                    remoteAddress = remoteDeployment.programId
+                                } catch (error) {
+                                    console.warn(
+                                        `Failed to get remote Solana deployment for EID ${remoteContract.eid}:`,
+                                        error
+                                    )
+                                }
+                            } else if (
+                                !isSolanaEID(remoteContract.eid) &&
+                                !remoteAddress &&
+                                remoteContract.contractName
+                            ) {
+                                // For EVM contracts, get address from deployment file
+                                try {
+                                    remoteAddress = getEVMContractAddress(
+                                        remoteContract.eid,
+                                        remoteContract.contractName
+                                    )
+                                } catch (error) {
+                                    console.warn(
+                                        `Failed to get remote EVM deployment for EID ${remoteContract.eid}:`,
+                                        error
+                                    )
+                                }
+                            }
+
+                            return {
+                                address: remoteAddress,
+                                endpointId: remoteContract.eid,
+                            }
+                        }),
                     solanaConfig: {
                         mint: solanaDetails.mint,
                         escrow: solanaDetails.escrow,
@@ -146,15 +265,21 @@ task('lz:oapp:db-export', 'Exports a lz config file to a JSON object for the lz-
                     },
                     isProxy: true,
                     tokenAddress: solanaDetails.mint,
-                    image: '',
+                    image: sharedCoinGeckoData.image,
                 }
             } else {
                 // Handle EVM contract
                 const rpcUrl = EID_TO_RPC[eid]
                 let evmDetails = { name: '', symbol: '', decimals: 18 }
 
-                if (rpcUrl && contract.address) {
-                    evmDetails = await getEVMContractDetails(contract.address, rpcUrl)
+                // Get contract address from deployment file if not provided
+                let contractAddress = contract.address
+                if (!contractAddress && contract.contractName) {
+                    contractAddress = getEVMContractAddress(eid, contract.contractName)
+                }
+
+                if (rpcUrl && contractAddress) {
+                    evmDetails = await getEVMContractDetails(contractAddress, rpcUrl)
                 } else if (contract.contractName) {
                     // Use contract name as symbol fallback
                     tokenSymbol = contract.contractName
@@ -163,22 +288,60 @@ task('lz:oapp:db-export', 'Exports a lz config file to a JSON object for the lz-
                 tokenSymbol = evmDetails.symbol || contract.contractName || 'EVM'
 
                 outputData = {
-                    assetId: '',
+                    assetId: sharedCoinGeckoData.assetId,
                     name: evmDetails.name,
                     symbol: evmDetails.symbol,
-                    address: contract.address || '',
+                    address: contractAddress || '',
                     decimals: evmDetails.decimals,
                     networkId: networkId,
                     endpointId: eid,
                     remoteChains: config.contracts
-                        .filter((c: any) => c.contract.eid !== eid)
-                        .map((c: any) => ({
-                            address: c.contract.address || '',
-                            endpointId: c.contract.eid,
-                        })),
+                        .filter((c: { contract: { eid: number } }) => c.contract.eid !== eid)
+                        .map((c: { contract: { eid: number; address?: string; contractName?: string } }) => {
+                            const remoteContract = c.contract
+                            let remoteAddress = remoteContract.address || ''
+
+                            // For Solana contracts, use the mint address if no address is specified
+                            if (isSolanaEID(remoteContract.eid) && !remoteAddress) {
+                                try {
+                                    const remoteDeployment = getSolanaDeployment(
+                                        remoteContract.eid,
+                                        remoteContract.contractName || 'OFT.json'
+                                    )
+                                    remoteAddress = remoteDeployment.mint
+                                } catch (error) {
+                                    console.warn(
+                                        `Failed to get remote Solana deployment for EID ${remoteContract.eid}:`,
+                                        error
+                                    )
+                                }
+                            } else if (
+                                !isSolanaEID(remoteContract.eid) &&
+                                !remoteAddress &&
+                                remoteContract.contractName
+                            ) {
+                                // For EVM contracts, get address from deployment file
+                                try {
+                                    remoteAddress = getEVMContractAddress(
+                                        remoteContract.eid,
+                                        remoteContract.contractName
+                                    )
+                                } catch (error) {
+                                    console.warn(
+                                        `Failed to get remote EVM deployment for EID ${remoteContract.eid}:`,
+                                        error
+                                    )
+                                }
+                            }
+
+                            return {
+                                address: remoteAddress,
+                                endpointId: remoteContract.eid,
+                            }
+                        }),
                     isProxy: false,
-                    tokenAddress: contract.address || '0x0000000000000000000000000000000000000000',
-                    image: '',
+                    tokenAddress: contractAddress || '0x0000000000000000000000000000000000000000',
+                    image: sharedCoinGeckoData.image,
                 }
             }
 
