@@ -84,6 +84,8 @@ pnpm hardhat lz:oapp:wire --oapp-config --oapp-config configs/<TAG_NAME>-lz.conf
 pnpm hardhat lz:oapp:db-export --oapp-config <PATH_TO_CONFIG>
 ```
 
+// TODO insert glueNetworkToken object in assets collection
+
 6. Test in the UI
 
 Insert into the dev database and test these pathways through the UI.
