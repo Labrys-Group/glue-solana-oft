@@ -1,0 +1,18 @@
+{
+  "assetId": "",
+  "name": "",
+  "symbol": "",
+  "address": "",
+  "decimals": 18,
+  "networkId": 1300,
+  "endpointId": 30342,
+  "remoteChains": [
+    {
+      "address": "7aJdnmHwaRWU4E9Fz5dREB8XiwDDxb4Jz3E2FvjGRnso",
+      "endpointId": 30168
+    }
+  ],
+  "isProxy": false,
+  "tokenAddress": "0x0000000000000000000000000000000000000000",
+  "image": "https://assets.coingecko.com/coins/images/53746/standard/trump.png?1737171561"
+}

@@ -1,0 +1,18 @@
+{
+  "assetId": "pudgy-penguins",
+  "name": "Pudgy Penguins",
+  "symbol": "PENGU",
+  "address": "0x46f667B9F352FC1F87d5A1E08b9d20Df7071584d",
+  "decimals": 18,
+  "networkId": 1300,
+  "endpointId": 30342,
+  "remoteChains": [
+    {
+      "address": "7aJdnmHwaRWU4E9Fz5dREB8XiwDDxb4Jz3E2FvjGRnso",
+      "endpointId": 30168
+    }
+  ],
+  "isProxy": false,
+  "tokenAddress": "0x0000000000000000000000000000000000000000",
+  "image": "https://coin-images.coingecko.com/coins/images/52622/large/PUDGY_PENGUINS_PENGU_PFP.png?1733809110"
+}

@@ -1,0 +1,23 @@
+{
+  "assetId": "",
+  "name": "",
+  "symbol": "",
+  "address": "",
+  "decimals": 9,
+  "networkId": 101,
+  "endpointId": 30168,
+  "remoteChains": [
+    {
+      "address": "",
+      "endpointId": 30342
+    }
+  ],
+  "solanaConfig": {
+    "mint": "",
+    "escrow": "",
+    "programId": ""
+  },
+  "isProxy": true,
+  "tokenAddress": "",
+  "image": ""
+}

@@ -236,14 +236,15 @@ export const saveSolanaDeployment = (
     mint: string,
     mintAuthority: string,
     escrow: string,
-    oftStore: string
+    oftStore: string,
+    contractName = 'OFT-00'
 ) => {
     const outputDir = `./deployments/${endpointIdToNetwork(eid)}`
     if (!existsSync(outputDir)) {
         mkdirSync(outputDir, { recursive: true })
     }
     writeFileSync(
-        `${outputDir}/OFT.json`,
+        `${outputDir}/${contractName}-oft.json`,
         JSON.stringify(
             {
                 programId,
@@ -256,7 +257,7 @@ export const saveSolanaDeployment = (
             4
         )
     )
-    console.log(`Accounts have been saved to ${outputDir}/OFT.json`)
+    console.log(`Accounts have been saved to ${outputDir}/${contractName}-oft.json`)
 }
 
 /**
@@ -265,7 +266,8 @@ export const saveSolanaDeployment = (
  * @returns The contents of the OFT.json file as a JSON object.
  */
 export const getSolanaDeployment = (
-    eid: EndpointId
+    eid: EndpointId,
+    contractName: string
 ): {
     programId: string
     mint: string
@@ -278,7 +280,7 @@ export const getSolanaDeployment = (
     }
     const outputDir = path.join('deployments', endpointIdToNetwork(eid))
 
-    const filePath = path.join(outputDir, 'OFT.json') // Note: if you have multiple deployments, change this filename to refer to the desired deployment file
+    const filePath = path.join(outputDir, `${contractName}-oft.json`) // Note: if you have multiple deployments, change this filename to refer to the desired deployment file
 
     if (!existsSync(filePath)) {
         DebugLogger.printErrorAndFixSuggestion(KnownErrors.SOLANA_DEPLOYMENT_NOT_FOUND)
@@ -289,8 +291,8 @@ export const getSolanaDeployment = (
     return JSON.parse(fileContents)
 }
 
-export const getOftStoreAddress = (eid: EndpointId) => {
-    const { oftStore } = getSolanaDeployment(eid)
+export const getOftStoreAddress = (eid: EndpointId, contractName: string) => {
+    const { oftStore } = getSolanaDeployment(eid, contractName)
     if (!oftStore) {
         throw new Error('oftStore not defined in the deployment file')
     }
@@ -394,5 +396,3 @@ export const getComputeUnitPriceAndLimit = async (
         computeUnits,
     }
 }
-
-

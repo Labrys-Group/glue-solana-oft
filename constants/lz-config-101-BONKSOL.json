@@ -1,0 +1,23 @@
+{
+  "assetId": "bonk-staked-sol",
+  "name": "bonkSOL",
+  "symbol": "bonkSOL",
+  "address": "7aJdnmHwaRWU4E9Fz5dREB8XiwDDxb4Jz3E2FvjGRnso",
+  "decimals": 9,
+  "networkId": 101,
+  "endpointId": 30168,
+  "remoteChains": [
+    {
+      "address": "0x1530537C191e00878BB2e714b5cf62CD5c9c894B",
+      "endpointId": 30342
+    }
+  ],
+  "solanaConfig": {
+    "mint": "BonK1YhkXEGLZzwtcvRTip3gAL9nCeQD7ppZBLXhtTs",
+    "escrow": "FKW79ymVkeY7T8oeBTUwS5aKUKV2C6FN1iijKNChKDv3",
+    "programId": "7aJdnmHwaRWU4E9Fz5dREB8XiwDDxb4Jz3E2FvjGRnso"
+  },
+  "isProxy": true,
+  "tokenAddress": "BonK1YhkXEGLZzwtcvRTip3gAL9nCeQD7ppZBLXhtTs",
+  "image": "https://coin-images.coingecko.com/coins/images/37473/large/bonksol.jpg?1751787827"
+}
