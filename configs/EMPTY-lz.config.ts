@@ -5,7 +5,7 @@ import { OAppEnforcedOption, OmniPointHardhat } from '@layerzerolabs/toolbox-har
 
 import { getOftStoreAddress } from '../tasks/solana'
 
-const contractName = 'PENGU'
+const contractName = 'EXAMPLE'
 
 const glueMainnetContract: OmniPointHardhat = {
     eid: EndpointId.GLUE_V2_MAINNET,
@@ -14,7 +14,8 @@ const glueMainnetContract: OmniPointHardhat = {
 
 const solanaContract: OmniPointHardhat = {
     eid: EndpointId.SOLANA_V2_MAINNET,
-    address: getOftStoreAddress(EndpointId.SOLANA_V2_MAINNET, `${contractName}-oft.json`),
+    address: getOftStoreAddress(EndpointId.SOLANA_V2_MAINNET, `${contractName}`),
+    contractName,
 }
 
 const EVM_ENFORCED_OPTIONS: OAppEnforcedOption[] = [

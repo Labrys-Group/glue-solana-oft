@@ -1,0 +1,23 @@
+{
+  "assetId": "burger",
+  "name": "Burger",
+  "symbol": "BURGER",
+  "address": "7aJdnmHwaRWU4E9Fz5dREB8XiwDDxb4Jz3E2FvjGRnso",
+  "decimals": 6,
+  "networkId": 101,
+  "endpointId": 30168,
+  "remoteChains": [
+    {
+      "address": "0x63FDA9Ef3D24B98851D73bCbaAB9dE96468574D7",
+      "endpointId": 30342
+    }
+  ],
+  "solanaConfig": {
+    "mint": "632SvBrfaep51NGKnKtUHTR9J2T4uYGKEQkCgy42USA",
+    "escrow": "BN3bUcrVRPYMCZjbexBnEyYCFMocofVwxDDkSxRcW8K4",
+    "programId": "7aJdnmHwaRWU4E9Fz5dREB8XiwDDxb4Jz3E2FvjGRnso"
+  },
+  "isProxy": true,
+  "tokenAddress": "632SvBrfaep51NGKnKtUHTR9J2T4uYGKEQkCgy42USA",
+  "image": "https://ipfs.io/ipfs/QmatYxYB4dfsK7WVVJuijyqEDzgt3orUZeCuvyNHRVfQeP"
+}

@@ -38,6 +38,7 @@ interface Args {
     isSolanaInitConfig: boolean // For internal use only. This helps us to control which code runs depdending on whether the task ran is wire or init-config
     oappConfig: string
     internalConfigurator?: OAppConfigurator
+    contractName: string
 }
 
 /**
@@ -52,6 +53,7 @@ task(TASK_LZ_OAPP_WIRE)
     // The tasks that are using custom configurators will override this argument with the configurator of their choice
     .addParam('internalConfigurator', 'FOR INTERNAL USE ONLY', undefined, devtoolsTypes.fn, true)
     .addParam('isSolanaInitConfig', 'FOR INTERNAL USE ONLY', undefined, devtoolsTypes.boolean, true)
+    .addParam('contractName', 'The name of the token', undefined, devtoolsTypes.string, true)
     .setAction(async (args: Args, hre, runSuper) => {
         const logger = createLogger(args.logLevel)
 
@@ -75,7 +77,7 @@ task(TASK_LZ_OAPP_WIRE)
         const userAccount = keypair.publicKey
 
         const solanaEid = await findSolanaEndpointIdInGraph(hre, args.oappConfig)
-        const solanaDeployment = getSolanaDeployment(solanaEid)
+        const solanaDeployment = getSolanaDeployment(solanaEid, args.contractName)
 
         // Then we grab the programId from the args
         const programId = new PublicKey(solanaDeployment.programId)
