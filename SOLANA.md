@@ -60,6 +60,7 @@ pnpm hardhat lz:oft-adapter:solana:create
   --program-id 7aJdnmHwaRWU4E9Fz5dREB8XiwDDxb4Jz3E2FvjGRnso
   --mint <TOKEN_MINT>
   --token-program <TOKEN_PROGRAM_ID>
+  --contract-name <TOKEN_NAME>
 ```
 
 this will output a file <TAG_NAME>-oft.json to the `deployments/solana-mainnet/*` directory.
@@ -69,13 +70,13 @@ this will output a file <TAG_NAME>-oft.json to the `deployments/solana-mainnet/*
 3. Initialise the LZ OApp by running:
 
 ```bash
-pnpm hardhat lz:oft:solana:init-config --oapp-config configs/<TAG_NAME>-lz.config.ts
+pnpm hardhat lz:oft:solana:init-config --oapp-config configs/<TAG_NAME>-lz.config.ts --contract-name <TOKEN_NAME>
 ```
 
 4. Wire up the LZ Oapp
 
 ```bash
-pnpm hardhat lz:oapp:wire --oapp-config --oapp-config configs/<TAG_NAME>-lz.config.ts
+pnpm hardhat lz:oapp:wire --oapp-config --oapp-config configs/<TAG_NAME>-lz.config.ts --contract-name <TOKEN_NAME>
 ```
 
 5. Generate the DB Files

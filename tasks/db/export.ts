@@ -225,7 +225,7 @@ task('lz:oapp:db-export', 'Exports a lz config file to a JSON object for the lz-
                                 try {
                                     const remoteDeployment = getSolanaDeployment(
                                         remoteContract.eid,
-                                        remoteContract.contractName
+                                        remoteContract.contractName || ''
                                     )
                                     remoteAddress = remoteDeployment.programId
                                 } catch (error) {
@@ -307,7 +307,7 @@ task('lz:oapp:db-export', 'Exports a lz config file to a JSON object for the lz-
                                 try {
                                     const remoteDeployment = getSolanaDeployment(
                                         remoteContract.eid,
-                                        remoteContract.contractName
+                                        remoteContract.contractName || ''
                                     )
                                     remoteAddress = remoteDeployment.programId
                                 } catch (error) {

@@ -1,0 +1,18 @@
+{
+  "assetId": "burger",
+  "name": "Burger",
+  "symbol": "BURGER",
+  "address": "0x63FDA9Ef3D24B98851D73bCbaAB9dE96468574D7",
+  "decimals": 18,
+  "networkId": 1300,
+  "endpointId": 30342,
+  "remoteChains": [
+    {
+      "address": "7aJdnmHwaRWU4E9Fz5dREB8XiwDDxb4Jz3E2FvjGRnso",
+      "endpointId": 30168
+    }
+  ],
+  "isProxy": false,
+  "tokenAddress": "0x0000000000000000000000000000000000000000",
+  "image": "https://ipfs.io/ipfs/QmatYxYB4dfsK7WVVJuijyqEDzgt3orUZeCuvyNHRVfQeP"
+}
