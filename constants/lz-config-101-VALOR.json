@@ -1,0 +1,23 @@
+{
+  "assetId": "valor-2",
+  "name": "VALOR",
+  "symbol": "VALOR",
+  "address": "7aJdnmHwaRWU4E9Fz5dREB8XiwDDxb4Jz3E2FvjGRnso",
+  "decimals": 6,
+  "networkId": 101,
+  "endpointId": 30168,
+  "remoteChains": [
+    {
+      "address": "0x0dFFFaC928Dc84D8713b4049765cCB3529aA8759",
+      "endpointId": 30342
+    }
+  ],
+  "solanaConfig": {
+    "mint": "3wPQhXYqy861Nhoc4bahtpf7G3e89XCLfZ67ptEfZUSA",
+    "escrow": "ExTMYpPyT36RmQdRdhqzZ2UCnXeBvg55iNGFg6NvHXWQ",
+    "programId": "7aJdnmHwaRWU4E9Fz5dREB8XiwDDxb4Jz3E2FvjGRnso"
+  },
+  "isProxy": true,
+  "tokenAddress": "3wPQhXYqy861Nhoc4bahtpf7G3e89XCLfZ67ptEfZUSA",
+  "image": "https://coin-images.coingecko.com/coins/images/70248/large/VALOR.jpg?1761244246"
+}
